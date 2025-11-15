@@ -39,49 +39,37 @@ export default function AdminLogin() {
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 400, margin: "0 auto" }}>
-      <h2>Admin Login</h2>
-      <p>Only authorized staff can access the dashboard.</p>
+  <div className="max-w-md mx-auto mt-10 bg-white p-6 rounded-lg shadow">
+    <h2 className="text-2xl font-semibold mb-4">Admin Login</h2>
 
-      {error && (
-        <div style={{ color: "red", marginBottom: 10 }}>{error}</div>
-      )}
+    {error && <p className="text-red-600 mb-2">{error}</p>}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label>
-            Email:
-            <br />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ width: "100%", padding: 8, marginTop: 4 }}
-            />
-          </label>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
 
-        <div style={{ marginBottom: 12 }}>
-          <label>
-            Password:
-            <br />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: "100%", padding: 8, marginTop: 4 }}
-            />
-          </label>
-        </div>
+      <div>
+        <label className="block mb-1 font-medium">Email</label>
+        <input
+          type="email"
+          className="w-full border p-2 rounded"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ padding: "8px 16px", cursor: loading ? "not-allowed" : "pointer" }}
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
-    </div>
-  );
+      <div>
+        <label className="block mb-1 font-medium">Password</label>
+        <input
+          type="password"
+          className="w-full border p-2 rounded"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
+
+      <button className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+        {loading ? "Logging in..." : "Login"}
+      </button>
+    </form>
+  </div>
+);
 }

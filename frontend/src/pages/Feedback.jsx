@@ -66,97 +66,68 @@ export default function Feedback() {
     }
   };
 
-  return (
-    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-      <h2>Give Feedback</h2>
-      <p>Your feedback is anonymous and helps improve the university.</p>
+  return(
+  <div className="max-w-xl mx-auto p-6 bg-white rounded-lg shadow mt-6">
+    <h2 className="text-2xl font-semibold mb-4">Give Feedback</h2>
 
-      {loadingDepts && <p>Loading departments...</p>}
+    {error && <p className="text-red-600 mb-3">{error}</p>}
+    {message && <p className="text-green-600 mb-3">{message}</p>}
 
-      {error && (
-        <div style={{ color: "red", marginBottom: 10 }}>
-          {error}
-        </div>
-      )}
-      {message && (
-        <div style={{ color: "green", marginBottom: 10 }}>
-          {message}
-        </div>
-      )}
+    <form onSubmit={handleSubmit} className="space-y-5">
 
-      {!loadingDepts && departments.length === 0 && (
-        <p>No departments available yet.</p>
-      )}
+      {/* Department Dropdown */}
+      <div>
+        <label className="block mb-1 font-medium">Department</label>
+        <select
+          className="w-full border p-2 rounded"
+          value={departmentId}
+          onChange={(e) => setDepartmentId(e.target.value)}
+        >
+          <option value="">Choose a department</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
+      </div>
 
-      {!loadingDepts && departments.length > 0 && (
-        <form onSubmit={handleSubmit} style={{ marginTop: 10 }}>
-          {/* Department select */}
-          <div style={{ marginBottom: 15 }}>
-            <label>
-              Department:
-              <br />
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                style={{ width: "100%", padding: 8, marginTop: 5 }}
-              >
-                <option value="">-- Select a department --</option>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {/* Rating */}
-          <div style={{ marginBottom: 15 }}>
-            <span>Rating:</span>
-            <div style={{ marginTop: 5 }}>
-              {ratings.map((r) => (
-                <label key={r} style={{ display: "block", marginBottom: 4 }}>
-                  <input
-                    type="radio"
-                    name="rating"
-                    value={r}
-                    checked={rating === r}
-                    onChange={() => setRating(r)}
-                    style={{ marginRight: 6 }}
-                  />
-                  {r}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Comment */}
-          <div style={{ marginBottom: 15 }}>
-            <label>
-              Comment (optional):
-              <br />
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={4}
-                style={{ width: "100%", padding: 8, marginTop: 5 }}
-                placeholder="Write anything you want the department to know..."
+      {/* Rating */}
+      <div>
+        <label className="block mb-1 font-medium">Rating</label>
+        <div className="space-y-2">
+          {ratings.map((r) => (
+            <label key={r} className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="rating"
+                value={r}
+                checked={rating === r}
+                onChange={() => setRating(r)}
               />
+              {r}
             </label>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{
-              padding: "8px 16px",
-              cursor: submitting ? "not-allowed" : "pointer",
-            }}
-          >
-            {submitting ? "Submitting..." : "Submit Feedback"}
-          </button>
-        </form>
-      )}
-    </div>
-  );
+      {/* Comment */}
+      <div>
+        <label className="block mb-1 font-medium">Comment (optional)</label>
+        <textarea
+          className="w-full border p-2 rounded"
+          rows="4"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        ></textarea>
+      </div>
+
+      <button
+        type="submit"
+        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+      >
+        Submit Feedback
+      </button>
+    </form>
+  </div>
+);
+
 }

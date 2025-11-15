@@ -1,312 +1,260 @@
 import { useEffect, useState } from "react";
+import axios from "../api";
 import { useNavigate } from "react-router-dom";
-import api, { setAuthToken } from "../api";
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState(null);
-  const [departments, setDepartments] = useState([]);
-  const [newDeptName, setNewDeptName] = useState("");
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [savingDept, setSavingDept] = useState(false);
-
   const navigate = useNavigate();
+  const [stats, setStats] = useState({});
+  const [departments, setDepartments] = useState([]);
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [newDept, setNewDept] = useState("");
+  const [renameDeptId, setRenameDeptId] = useState(null);
+  const [renameDeptName, setRenameDeptName] = useState("");
 
-  // logout function
-  const logout = () => {
-    localStorage.removeItem("adminToken");
-    setAuthToken(null);
-    navigate("/admin/login");
-  };
-
-  // load stats + departments on mount
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (!token) {
-      setError("You must log in as admin to view this page.");
-      setLoading(false);
-      return;
-    }
-
-    const fetchAll = async () => {
-      try {
-        const [statsRes, deptsRes] = await Promise.all([
-          api.get("/api/stats"),
-          api.get("/api/departments"),
-        ]);
-
-        setStats(statsRes.data);
-        setDepartments(deptsRes.data);
-      } catch (err) {
-        console.error(err);
-        setError("Could not load dashboard data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAll();
+    fetchStats();
+    fetchDepartments();
+    fetchFeedbacks();
   }, []);
 
-  // add a new department
-  const handleAddDepartment = async (e) => {
-    e.preventDefault();
-    if (!newDeptName.trim()) return;
-
-    try {
-      setSavingDept(true);
-      const res = await api.post("/api/departments", {
-        name: newDeptName.trim(),
-      });
-      setDepartments((prev) => [...prev, res.data]);
-      setNewDeptName("");
-    } catch (err) {
-      console.error(err);
-      setError("Could not add department.");
-    } finally {
-      setSavingDept(false);
-    }
-  };
-
-  // rename department
-  const handleRenameDepartment = async (id, newName) => {
-    if (!newName.trim()) return;
-    try {
-      const res = await api.put(`/api/departments/${id}`, {
-        name: newName.trim(),
-      });
-      setDepartments((prev) =>
-        prev.map((d) => (d.id === id ? res.data : d))
-      );
-    } catch (err) {
-      console.error(err);
-      setError("Could not rename department.");
-    }
-  };
-
-  // delete department
-  const handleDeleteDepartment = async (id) => {
-    if (!window.confirm("Delete this department?")) return;
-    try {
-      await api.delete(`/api/departments/${id}`);
-      setDepartments((prev) => prev.filter((d) => d.id !== id));
-    } catch (err) {
-      console.error(err);
-      setError("Could not delete department.");
-    }
-  };
-
-  // download Excel export
-  const handleDownloadExcel = async () => {
-    try {
-      const res = await api.get("/api/feedback/export", {
-        responseType: "blob",
-      });
-
-      const blob = new Blob([res.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "feedback_export.xlsx";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      setError("Could not download Excel file.");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: 20 }}>
-        <h2>Admin Dashboard</h2>
-        <p>Loading...</p>
-      </div>
-    );
+  async function fetchStats() {
+    const res = await axios.get("/api/stats");
+    setStats(res.data);
   }
 
-  if (error) {
-    return (
-      <div style={{ padding: 20 }}>
-        <h2>Admin Dashboard</h2>
-        <p style={{ color: "red" }}>{error}</p>
-      </div>
-    );
+  async function fetchDepartments() {
+    const res = await axios.get("/api/departments");
+    setDepartments(res.data);
+  }
+
+  async function fetchFeedbacks() {
+    const res = await axios.get("/api/feedback");
+    setFeedbacks(res.data);
+  }
+
+  async function addDepartment(e) {
+    e.preventDefault();
+    if (!newDept.trim()) return;
+
+    await axios.post("/api/departments", { name: newDept });
+    setNewDept("");
+    fetchDepartments();
+  }
+
+  async function renameDepartment(e) {
+    e.preventDefault();
+    await axios.put(`/api/departments/${renameDeptId}`, {
+      name: renameDeptName,
+    });
+
+    setRenameDeptId(null);
+    setRenameDeptName("");
+    fetchDepartments();
+  }
+
+  async function deleteDepartment(id) {
+    await axios.delete(`/api/departments/${id}`);
+    fetchDepartments();
+  }
+
+  function logout() {
+    localStorage.removeItem("token");
+    navigate("/admin/login");
+  }
+
+  async function downloadExcel() {
+    const res = await axios.get("/api/feedback/export", {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "feedbacks.xlsx";
+    a.click();
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 900, margin: "0 auto" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 10,
-        }}
-      >
-        <h2>Admin Dashboard</h2>
+    <div className="max-w-5xl mx-auto p-6 bg-white">
+
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-3xl font-bold text-[#00843D]">
+          Admin Dashboard
+        </h2>
         <button
           onClick={logout}
-          style={{
-            padding: "6px 12px",
-            background: "#eee",
-            border: "1px solid #ccc",
-            borderRadius: 4,
-            cursor: "pointer",
-          }}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
         >
           Logout
         </button>
       </div>
 
-      {/* STATS */}
-      {stats && (
-        <section style={{ marginBottom: 25 }}>
-          <h3>Overview</h3>
-          <p>
-            Total feedbacks: <strong>{stats.totalFeedbacks}</strong>
-          </p>
+      {/* Stats */}
+      <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6">
+        <h3 className="text-xl font-semibold mb-4 text-[#00843D]">
+          Overview
+        </h3>
 
-          <h4>Per Department</h4>
-          <ul>
-            {stats.departments.map((d) => (
-              <li key={d.id}>
-                <strong>{d.name}</strong> – {d.feedbackCount} feedback(s)
-                {", avg score: "}
-                {d.averageScore ? d.averageScore.toFixed(2) : "N/A"}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white border border-green-200 p-4 rounded shadow text-center">
+            <p className="text-lg font-semibold text-gray-700">
+              Total Feedbacks
+            </p>
+            <p className="text-3xl font-bold text-[#00843D]">
+              {stats.totalFeedbacks || 0}
+            </p>
+          </div>
 
-      {/* DEPARTMENTS MANAGEMENT */}
-      <section style={{ marginBottom: 25 }}>
-        <h3>Departments</h3>
+          <div className="bg-white border border-green-200 p-4 rounded shadow text-center">
+            <p className="text-lg font-semibold text-gray-700">
+              Departments
+            </p>
+            <p className="text-3xl font-bold text-[#00843D]">
+              {departments.length}
+            </p>
+          </div>
 
-        <form onSubmit={handleAddDepartment} style={{ marginBottom: 15 }}>
+          <div className="bg-white border border-green-200 p-4 rounded shadow text-center">
+            <p className="text-lg font-semibold text-gray-700">
+              Last Submission
+            </p>
+            <p className="text-gray-600 break-all">
+              {stats.lastSubmission || "None"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Add Department */}
+      <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6">
+        <h3 className="text-xl font-semibold mb-4 text-[#00843D]">
+          Add Department
+        </h3>
+
+        <form onSubmit={addDepartment} className="flex gap-3">
           <input
             type="text"
-            placeholder="New department name"
-            value={newDeptName}
-            onChange={(e) => setNewDeptName(e.target.value)}
-            style={{ padding: 8, width: "60%", marginRight: 8 }}
+            className="border p-2 rounded flex-1 outline-[#00843D]"
+            placeholder="Department name"
+            value={newDept}
+            onChange={(e) => setNewDept(e.target.value)}
           />
-          <button
-            type="submit"
-            disabled={savingDept}
-            style={{ padding: "8px 16px" }}
-          >
-            {savingDept ? "Adding..." : "Add Department"}
+
+          <button className="px-4 py-2 bg-[#00843D] text-white rounded hover:bg-[#006B31]">
+            Add
           </button>
         </form>
-
-        {departments.length === 0 ? (
-          <p>No departments yet.</p>
-        ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: 10,
-            }}
-          >
-            <thead>
-              <tr>
-                <th
-                  style={{
-                    borderBottom: "1px solid #ccc",
-                    textAlign: "left",
-                    paddingBottom: 6,
-                  }}
-                >
-                  Name
-                </th>
-                <th
-                  style={{
-                    borderBottom: "1px solid #ccc",
-                    textAlign: "left",
-                    paddingBottom: 6,
-                  }}
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {departments.map((dept) => (
-                <DeptRow
-                  key={dept.id}
-                  dept={dept}
-                  onRename={handleRenameDepartment}
-                  onDelete={handleDeleteDepartment}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
       </section>
 
-      {/* EXCEL EXPORT */}
-      <section>
-        <h3>Reports</h3>
-        <button onClick={handleDownloadExcel} style={{ padding: "8px 16px" }}>
-          Download Feedback Excel
-        </button>
+      {/* Department List */}
+      <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6">
+        <h3 className="text-xl font-semibold mb-4 text-[#00843D]">
+          Departments
+        </h3>
+
+        <table className="w-full border border-gray-200 rounded overflow-hidden">
+          <thead className="bg-green-100 border-b border-gray-300">
+            <tr>
+              <th className="p-3 text-left text-gray-700">Name</th>
+              <th className="p-3 text-left text-gray-700">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {departments.map((d) => (
+              <tr key={d.id} className="border-t">
+                <td className="p-3">
+                  {renameDeptId === d.id ? (
+                    <input
+                      type="text"
+                      className="border p-1 rounded w-full outline-[#00843D]"
+                      value={renameDeptName}
+                      onChange={(e) => setRenameDeptName(e.target.value)}
+                    />
+                  ) : (
+                    <span className="text-gray-800">{d.name}</span>
+                  )}
+                </td>
+
+                <td className="p-3 flex gap-3">
+                  {renameDeptId === d.id ? (
+                    <>
+                      <button
+                        onClick={renameDepartment}
+                        className="px-3 py-1 bg-[#00843D] text-white rounded hover:bg-[#006B31]"
+                      >
+                        Save
+                      </button>
+
+                      <button
+                        onClick={() => setRenameDeptId(null)}
+                        className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setRenameDeptId(d.id);
+                          setRenameDeptName(d.name);
+                        }}
+                        className="px-3 py-1 bg-[#00843D] text-white rounded hover:bg-[#006B31]"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => deleteDepartment(d.id)}
+                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Feedbacks */}
+      <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold text-[#00843D]">
+            Feedbacks
+          </h3>
+
+          <button
+            onClick={downloadExcel}
+            className="px-4 py-2 bg-[#00843D] text-white rounded hover:bg-[#006B31]"
+          >
+            Download Excel
+          </button>
+        </div>
+
+        <ul className="space-y-3 max-h-80 overflow-y-auto">
+          {feedbacks.map((f) => (
+            <li key={f.id} className="border p-3 rounded bg-white shadow-sm">
+              <p>
+                <strong className="text-[#00843D]">Department:</strong> {f.departmentName}
+              </p>
+              <p>
+                <strong className="text-[#00843D]">Rating:</strong> {f.rating}
+              </p>
+              <p>
+                <strong className="text-[#00843D]">Comment:</strong> {f.comment || "No comment"}
+              </p>
+              <p className="text-gray-500 text-sm">
+                <strong className="text-[#00843D]">Date:</strong> {f.date}
+              </p>
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
-  );
-}
-
-// Row component for each department (inline editing)
-function DeptRow({ dept, onRename, onDelete }) {
-  const [editing, setEditing] = useState(false);
-  const [tempName, setTempName] = useState(dept.name);
-
-  const save = () => {
-    if (tempName.trim() && tempName !== dept.name) {
-      onRename(dept.id, tempName);
-    }
-    setEditing(false);
-  };
-
-  return (
-    <tr>
-      <td style={{ padding: "6px 0" }}>
-        {editing ? (
-          <input
-            value={tempName}
-            onChange={(e) => setTempName(e.target.value)}
-            style={{ padding: 4, width: "90%" }}
-          />
-        ) : (
-          dept.name
-        )}
-      </td>
-      <td>
-        {editing ? (
-          <>
-            <button onClick={save} style={{ marginRight: 6 }}>
-              Save
-            </button>
-            <button onClick={() => setEditing(false)}>Cancel</button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => setEditing(true)}
-              style={{ marginRight: 6 }}
-            >
-              Edit
-            </button>
-            <button onClick={() => onDelete(dept.id)}>Delete</button>
-          </>
-        )}
-      </td>
-    </tr>
   );
 }
