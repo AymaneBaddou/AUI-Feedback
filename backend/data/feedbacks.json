@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1763223827285,
+    "departmentId": 1,
+    "rating": "Unsatisfying",
+    "comment": "",
+    "createdAt": "2025-11-15T16:23:47.285Z"
+  },
+  {
+    "id": 1763224273502,
+    "departmentId": 1763224258731,
+    "rating": "Satisfying",
+    "comment": "",
+    "createdAt": "2025-11-15T16:31:13.502Z"
+  },
+  {
+    "id": 1763224294289,
+    "departmentId": 1763224258731,
+    "rating": "Neutral",
+    "comment": "",
+    "createdAt": "2025-11-15T16:31:34.289Z"
+  }
+]
