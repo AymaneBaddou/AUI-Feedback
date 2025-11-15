@@ -43,3 +43,7 @@ It’s lightweight, database-free, and perfect for educational institutions or s
 | 📁 JSON Files   | Data storage |
 | 📊 xlsx         | Excel export |
 ---
+
+## 📜 License
+
+This project is licensed under the MIT License.
