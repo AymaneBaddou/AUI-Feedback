@@ -107,10 +107,17 @@ app.post("/api/admin/login", (req, res) => {
 
 // ---- Departments ----
 
-// public: list departments (for feedback form)
+// public: list departments (for admin dashboard, stats, etc.)
 app.get("/api/departments", (req, res) => {
   const departments = readJson(departmentsFile);
   res.json(departments);
+});
+
+// public: get active department(s)
+app.get("/api/departments/active", (req, res) => {
+  const departments = readJson(departmentsFile);
+  const active = departments.filter((d) => d.active);
+  res.json(active);
 });
 
 // admin: create department
@@ -124,6 +131,7 @@ app.post("/api/departments", authMiddleware, (req, res) => {
   const newDept = {
     id: Date.now(),
     name: name.trim(),
+    active: false, // NEW FIELD
   };
   departments.push(newDept);
   writeJson(departmentsFile, departments);
@@ -151,6 +159,39 @@ app.put("/api/departments/:id", authMiddleware, (req, res) => {
   writeJson(departmentsFile, departments);
 
   res.json(departments[index]);
+});
+
+// admin: set active department (only one active at a time)
+app.put("/api/departments/:id/active", authMiddleware, (req, res) => {
+  const id = Number(req.params.id);
+  const departments = readJson(departmentsFile);
+
+  let found = false;
+
+  const updated = departments.map((d) => {
+    if (d.id === id) {
+      found = true;
+      return { ...d, active: true };
+    }
+    // make all other departments inactive
+    return { ...d, active: false };
+  });
+
+  if (!found) {
+    return res.status(404).json({ message: "Department not found" });
+  }
+
+  writeJson(departmentsFile, updated);
+  const activeDept = updated.find((d) => d.id === id);
+  res.json(activeDept);
+});
+
+// ✅ NEW: admin: clear active department (make all inactive)
+app.put("/api/departments/active/clear", authMiddleware, (req, res) => {
+  const departments = readJson(departmentsFile);
+  const updated = departments.map((d) => ({ ...d, active: false }));
+  writeJson(departmentsFile, updated);
+  res.json({ message: "All departments deactivated" });
 });
 
 // admin: delete department

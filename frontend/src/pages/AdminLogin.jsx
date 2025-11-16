@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "../api";
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState("admin@uni.com"); // default for testing
+  const [email, setEmail] = useState("admin@uni.com");
   const [password, setPassword] = useState("admin123");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -24,11 +25,9 @@ export default function AdminLogin() {
       const res = await api.post("/api/admin/login", { email, password });
       const { token } = res.data;
 
-      // save token
       localStorage.setItem("adminToken", token);
       setAuthToken(token);
 
-      // go to dashboard
       navigate("/admin/dashboard");
     } catch (err) {
       console.error(err);
@@ -39,37 +38,65 @@ export default function AdminLogin() {
   };
 
   return (
-  <div className="max-w-md mx-auto mt-10 bg-white p-6 rounded-lg shadow">
-    <h2 className="text-2xl font-semibold mb-4">Admin Login</h2>
+    <motion.div
+      className="max-w-md mx-auto mt-10 px-4"
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="max-w-md mx-auto mt-10 px-4">
+        <div className="bg-white p-6 shadow rounded-lg transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl">
+          <h2 className="text-2xl font-semibold text-[#00843D] mb-2">
+            Admin Login
+          </h2>
+          <p className="text-gray-600 text-sm mb-4">
+            Only authorized staff members are allowed to access the dashboard.
+          </p>
 
-    {error && <p className="text-red-600 mb-2">{error}</p>}
+          {error && (
+            <p className="text-red-600 mb-3 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">
+              {error}
+            </p>
+          )}
 
-    <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <input
+                type="email"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#00843D]"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-      <div>
-        <label className="block mb-1 font-medium">Email</label>
-        <input
-          type="email"
-          className="w-full border p-2 rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <input
+                type="password"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#00843D]"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <button
+              className={`w-full py-2 rounded text-sm font-medium text-white transition ${loading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#00843D] hover:bg-[#006B31] cursor-pointer"
+                }`}
+              type="submit"
+            >
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+        </div>
       </div>
-
-      <div>
-        <label className="block mb-1 font-medium">Password</label>
-        <input
-          type="password"
-          className="w-full border p-2 rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
-
-      <button className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
-        {loading ? "Logging in..." : "Login"}
-      </button>
-    </form>
-  </div>
-);
+    </motion.div>
+  );
 }
