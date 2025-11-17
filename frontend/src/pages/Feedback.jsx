@@ -101,7 +101,7 @@ export default function Feedback() {
         </p>
 
         {activeDept && (
-          <p className="mb-3 text-xs text-gray-700">
+          <p className="mb-3 text-2xl text-gray-700">
             You are currently rating:{" "}
             <span className="font-semibold text-[#00843D]">
               {activeDept.name}
