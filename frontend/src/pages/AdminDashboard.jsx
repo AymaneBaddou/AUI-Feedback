@@ -91,20 +91,20 @@ export default function AdminDashboard() {
     }
   };
 
-  // TOGGLE active department:
+  // TOGGLE active department using a single endpoint:
   // - if currently inactive => set as sole active
   // - if currently active   => clear all active
   const handleSetActive = async (id, isActive) => {
     try {
+      await api.put(`/api/departments/${id}/active`, { active: !isActive });
+
       if (isActive) {
-        // deactivate all
-        await api.put("/api/departments/active/clear");
+        // was active -> now everything inactive
         setDepartments((prev) =>
           prev.map((d) => ({ ...d, active: false }))
         );
       } else {
-        // set this one active, others inactive
-        await api.put(`/api/departments/${id}/active`);
+        // was inactive -> this one becomes active, others off
         setDepartments((prev) =>
           prev.map((d) =>
             d.id === id ? { ...d, active: true } : { ...d, active: false }
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <Header logout={logout} />
         <p className="mt-4 text-gray-600 text-sm">Loading dashboard…</p>
       </div>
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
 
   return (
     <motion.div
-      className="max-w-5xl mx-auto p-6"
+      className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
@@ -166,7 +166,7 @@ export default function AdminDashboard() {
           <p className="text-red-700">{error}</p>
         </div>
       )}
-
+      
       {/* STATS */}
       {stats && (
         <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl relative">
@@ -237,25 +237,27 @@ export default function AdminDashboard() {
             No departments yet. Add one above.
           </p>
         ) : (
-          <table className="w-full border border-gray-200 rounded text-sm">
-            <thead className="bg-green-100 border-b border-gray-300">
-              <tr>
-                <th className="p-3 text-left text-gray-700">Name</th>
-                <th className="p-3 text-left text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {departments.map((dept) => (
-                <DeptRow
-                  key={dept.id}
-                  dept={dept}
-                  onRename={handleRenameDepartment}
-                  onDelete={handleDeleteDepartment}
-                  onSetActive={handleSetActive}
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border border-gray-200 rounded text-xs sm:text-sm">
+              <thead className="bg-green-100 border-b border-gray-300">
+                <tr>
+                  <th className="p-3 text-left text-gray-700">Name</th>
+                  <th className="p-3 text-left text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {departments.map((dept) => (
+                  <DeptRow
+                    key={dept.id}
+                    dept={dept}
+                    onRename={handleRenameDepartment}
+                    onDelete={handleDeleteDepartment}
+                    onSetActive={handleSetActive}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -349,7 +351,7 @@ function DeptRow({ dept, onRename, onDelete, onSetActive }) {
           )}
         </div>
       </td>
-      <td className="p-3 space-x-2 whitespace-nowrap">
+      <td className="p-2 sm:p-3 space-x-1 sm:space-x-2 whitespace-nowrap">
         {editing ? (
           <>
             <button
