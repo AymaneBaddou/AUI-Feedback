@@ -268,6 +268,7 @@ app.get("/api/feedback/export", authMiddleware, (req, res) => {
     return {
       "Department Name": dept ? dept.name : "Unknown",
       "Rating Given": fb.rating,
+      "Rating Value": ratingWeights[fb.rating] || 0,
       "Comment (if any)": fb.comment || "",
       "Submission Date": new Date(fb.createdAt).toLocaleString(),
     };
@@ -277,6 +278,7 @@ app.get("/api/feedback/export", authMiddleware, (req, res) => {
     rows.push({
       "Department Name": "",
       "Rating Given": "",
+      "Rating Value": ratingWeights[fb.rating] || 0,
       "Comment (if any)": "",
       "Submission Date": "",
     });
@@ -285,6 +287,7 @@ app.get("/api/feedback/export", authMiddleware, (req, res) => {
   const worksheet = XLSX.utils.json_to_sheet(rows);
   worksheet["!cols"] = [
     { wch: 25 },
+    { wch: 15 },
     { wch: 15 },
     { wch: 50 },
     { wch: 25 },
