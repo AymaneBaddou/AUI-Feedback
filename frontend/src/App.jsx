@@ -21,16 +21,20 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
-
       {/* Conditional header */}
       {isAdminDashboard ? <AdminHeader /> : <Navbar />}
 
       <main className="flex-1">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
-            {/* 👇 Home page is now Feedback */}
+            
+            {/* Home page = Feedback */}
             <Route path="/" element={<Feedback />} />
-            {/* Admin routes stay the same */}
+            
+            {/* Optional alias */}
+            <Route path="/feedback" element={<Feedback />} />
+
+            {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Routes>
