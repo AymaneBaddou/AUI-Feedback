@@ -19,13 +19,6 @@ export default function Navbar() {
       {/* Menu items on the right */}
       <div className="space-x-6 flex items-center ml-auto">
         <Link
-          to="/"
-          className={`${linkBase} ${location.pathname === "/" ? active : inactive
-            }`}
-        >
-          Home
-        </Link>
-        <Link
           to="/feedback"
           className={`${linkBase} ${location.pathname === "/feedback" ? active : inactive
             }`}

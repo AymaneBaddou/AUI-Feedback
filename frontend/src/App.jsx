@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-// ❌ Removed Landing import
-// import Landing from "./pages/Landing";
 import Feedback from "./pages/Feedback";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -32,10 +30,6 @@ function App() {
           <Routes location={location} key={location.pathname}>
             {/* 👇 Home page is now Feedback */}
             <Route path="/" element={<Feedback />} />
-
-            {/* Optional secondary route: /feedback loads the same page */}
-            <Route path="/feedback" element={<Feedback />} />
-
             {/* Admin routes stay the same */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
