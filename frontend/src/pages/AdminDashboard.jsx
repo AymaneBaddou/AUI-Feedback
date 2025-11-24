@@ -3,10 +3,17 @@ import { motion } from "framer-motion";
 import api, { setAuthToken } from "../api";
 import { useNavigate } from "react-router-dom";
 
+// 📊 Recharts
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  AreaChart, Area,
+  PieChart, Pie, Cell
+} from "recharts";
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
+  const [feedbackTrend, setFeedbackTrend] = useState([]);
 
-  // RENAMED
   const [services, setServices] = useState([]);
   const [newServiceName, setNewServiceName] = useState("");
 
@@ -22,6 +29,7 @@ export default function AdminDashboard() {
     navigate("/admin/login");
   };
 
+  // 📌 Load data
   useEffect(() => {
     const token = localStorage.getItem("adminToken");
     if (!token) {
@@ -33,13 +41,28 @@ export default function AdminDashboard() {
 
     const fetchAll = async () => {
       try {
-        const [statsRes, servicesRes] = await Promise.all([
+        const [statsRes, servicesRes, feedbackRes] = await Promise.all([
           api.get("/api/stats"),
           api.get("/api/services"),
+          api.get("/api/feedback")
         ]);
 
         setStats(statsRes.data);
         setServices(servicesRes.data);
+
+        // Build feedback trend graph
+        const grouped = {};
+        feedbackRes.data.forEach((fb) => {
+          const date = fb.createdAt.split("T")[0];
+          grouped[date] = (grouped[date] || 0) + 1;
+        });
+
+        const formatted = Object.entries(grouped).map(([date, count]) => ({
+          date,
+          count,
+        }));
+
+        setFeedbackTrend(formatted);
       } catch (err) {
         console.error(err);
         setError("Could not load dashboard data.");
@@ -51,6 +74,7 @@ export default function AdminDashboard() {
     fetchAll();
   }, []);
 
+  // Service handlers
   const handleAddService = async (e) => {
     e.preventDefault();
     if (!newServiceName.trim()) return;
@@ -72,9 +96,7 @@ export default function AdminDashboard() {
   const handleRenameService = async (id, newName) => {
     if (!newName.trim()) return;
     try {
-      const res = await api.put(`/api/services/${id}`, {
-        name: newName.trim(),
-      });
+      const res = await api.put(`/api/services/${id}`, { name: newName.trim() });
       setServices((prev) =>
         prev.map((s) => (s.id === id ? res.data : s))
       );
@@ -99,6 +121,7 @@ export default function AdminDashboard() {
     try {
       await api.put(`/api/services/${id}/active`, { active: !isActive });
 
+      // Update UI immediately
       if (isActive) {
         setServices((prev) =>
           prev.map((s) => ({ ...s, active: false }))
@@ -106,7 +129,7 @@ export default function AdminDashboard() {
       } else {
         setServices((prev) =>
           prev.map((s) =>
-            s.id === id ? { ...s, active: true } : { ...s, active: false }
+            s.id === id ? { ...s, active: true } : s
           )
         );
       }
@@ -143,7 +166,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <div className="w-full px-10 py-10">
         <Header logout={logout} />
         <p className="mt-4 text-gray-600 text-sm">Loading dashboard…</p>
       </div>
@@ -152,47 +175,40 @@ export default function AdminDashboard() {
 
   return (
     <motion.div
-      className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6"
+      className="w-full px-10 py-10"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.3 }}
     >
-
       {error && (
         <div className="flex items-start gap-2 mb-4 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">
           <span className="mt-0.5">⚠️</span>
           <p className="text-red-700">{error}</p>
         </div>
       )}
-      
-      {/* STATS */}
+
+      {/* ---------------- OVERVIEW ---------------- */}
       {stats && (
-        <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl relative">
-          <div className="absolute inset-x-0 -top-1 h-1 bg-[#00843D] rounded-t-lg" />
-          <h3 className="text-xl font-semibold text-[#00843D] mb-4">
-            Overview
-          </h3>
+        <section className="w-full bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
+          <div className="h-1 w-full bg-[#00843D] rounded-t-lg -mt-6 mb-4"></div>
+
+          <h3 className="text-xl font-semibold text-[#00843D] mb-4">Overview</h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <StatCard label="Total Feedbacks" value={stats.totalFeedbacks} />
             <StatCard label="Services" value={stats.services.length} />
             <StatCard
               label="Services with Feedback"
-              value={
-                stats.services.filter((s) => s.feedbackCount > 0).length
-              }
+              value={stats.services.filter((s) => s.feedbackCount > 0).length}
             />
           </div>
 
-          <h4 className="mt-1 mb-2 font-semibold text-sm text-gray-700">
-            Per Service
-          </h4>
+          <h4 className="mt-1 mb-2 font-semibold text-sm text-gray-700">Per Service</h4>
           <ul className="text-sm text-gray-700 space-y-1">
             {stats.services.map((s) => (
               <li key={s.id}>
-                <span className="font-medium">{s.name}</span> –{" "}
-                {s.feedbackCount} feedback(s), avg score:{" "}
+                <span className="font-medium">{s.name}</span> – {s.feedbackCount} feedback(s), avg score:{" "}
                 {s.averageScore ? s.averageScore.toFixed(2) : "N/A"}
               </li>
             ))}
@@ -200,12 +216,44 @@ export default function AdminDashboard() {
         </section>
       )}
 
-      {/* SERVICES MANAGEMENT */}
-      <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl relative">
-        <div className="absolute inset-x-0 -top-1 h-1 bg-[#00843D] rounded-t-lg" />
-        <h3 className="text-xl font-semibold text-[#00843D] mb-4">
-          Services
-        </h3>
+      {/* ---------------- ANALYTICS ---------------- */}
+      {stats && (
+        <section className="w-full bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
+          <div className="h-1 w-full bg-[#00843D] rounded-t-lg -mt-6 mb-4"></div>
+
+          <h3 className="text-xl font-semibold text-[#00843D] mb-4">Analytics</h3>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+            {/* AVERAGE SCORE */}
+            <div className="bg-gray-50 p-6 rounded-lg border h-[360px]">
+              <h4 className="text-sm font-semibold text-gray-700 mb-4">Average Score per Service</h4>
+              <AverageScoreChart data={stats.services} />
+            </div>
+
+            {/* FEEDBACK TREND */}
+            <div className="bg-gray-50 p-6 rounded-lg border h-[360px]">
+              <h4 className="text-sm font-semibold text-gray-700 mb-4">Feedback Trend (per Date)</h4>
+              <FeedbackTrendChart data={feedbackTrend} />
+            </div>
+          </div>
+
+          {currentActive && (
+            <div className="mt-10 bg-gray-50 p-6 rounded-lg border max-w-lg mx-auto h-[360px]">
+              <h4 className="text-sm font-semibold text-gray-700 mb-4">
+                Rating Distribution — {currentActive.name}
+              </h4>
+              <RatingPieChart service={currentActive} stats={stats} />
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ---------------- SERVICES SECTION ---------------- */}
+      <section className="w-full bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
+        <div className="h-1 w-full bg-[#00843D] rounded-t-lg -mt-6 mb-4"></div>
+
+        <h3 className="text-xl font-semibold text-[#00843D] mb-4">Services</h3>
 
         <form
           onSubmit={handleAddService}
@@ -231,78 +279,67 @@ export default function AdminDashboard() {
           </button>
         </form>
 
-        {services.length === 0 ? (
-          <p className="text-gray-500 text-sm">
-            No services yet. Add one above.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border border-gray-200 rounded text-xs sm:text-sm">
-              <thead className="bg-green-100 border-b border-gray-300">
-                <tr>
-                  <th className="p-3 text-left text-gray-700">Name</th>
-                  <th className="p-3 text-left text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {services.map((service) => (
-                  <ServiceRow
-                    key={service.id}
-                    service={service}
-                    onRename={handleRenameService}
-                    onDelete={handleDeleteService}
-                    onSetActive={handleSetActive}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="overflow-x-auto w-full">
+          <table className="min-w-full border border-gray-200 rounded text-sm">
+            <thead className="bg-green-100 border-b border-gray-300">
+              <tr>
+                <th className="p-3 text-left text-gray-700">Name</th>
+                <th className="p-3 text-left text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {services.map((service) => (
+                <ServiceRow
+                  key={service.id}
+                  service={service}
+                  onRename={handleRenameService}
+                  onDelete={handleDeleteService}
+                  onSetActive={handleSetActive}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {/* REPORTS */}
-      <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl relative">
-        <div className="absolute inset-x-0 -top-1 h-1 bg-[#00843D] rounded-t-lg" />
-        <h3 className="text-xl font-semibold text-[#00843D] mb-3">
-          Reports
-        </h3>
+      {/* ---------------- REPORTS ---------------- */}
+      <section className="w-full bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
+        <div className="h-1 w-full bg-[#00843D] rounded-t-lg -mt-6 mb-4"></div>
+
+        <h3 className="text-xl font-semibold text-[#00843D] mb-3">Reports</h3>
         <p className="text-sm text-gray-600 mb-3">
-          Download all feedback in an Excel file for detailed review and
-          archiving.
+          Download all feedback as an Excel file for detailed review.
         </p>
+
         <button
           onClick={handleDownloadExcel}
           className="px-4 py-2 bg-[#00843D] text-white rounded text-sm hover:bg-[#006B31]"
         >
-          Download Feedback Excel
+          Download Excel
         </button>
       </section>
     </motion.div>
   );
 }
 
-/* --------- Small components --------- */
+/* ---------------- SMALL COMPONENTS ---------------- */
 
 function Header({ logout }) {
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200 mb-6 px-5 py-3 flex items-center justify-between relative">
-      <div className="absolute inset-x-0 -top-1 h-1 bg-[#00843D] rounded-t-lg" />
+    <div className="w-full bg-white rounded-lg shadow border border-gray-200 mb-8 px-5 py-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-[#00843D] text-white flex items-center justify-center text-xl">
-          ⚙️
+        <div className="w-10 h-10 rounded-full bg-[#00843D] text-white flex items-center justify-center text-xl">
+          👤
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">
-            Admin Dashboard
-          </h1>
-          <p className="text-xs text-gray-600">
-            Manage services & review feedback for AUI.
-          </p>
+          <h1 className="text-lg font-semibold text-gray-900">Admin Dashboard</h1>
+          <p className="text-xs text-gray-600">Manage services & review feedback</p>
         </div>
       </div>
+
       <button
         onClick={logout}
-        className="px-3 py-1.5 text-xs font-medium rounded border border-red-500 text-red-600 hover:bg-red-50"
+        className="px-4 py-2 text-xs font-medium rounded border border-red-500 text-red-600 hover:bg-red-50"
       >
         Logout
       </button>
@@ -312,7 +349,7 @@ function Header({ logout }) {
 
 function StatCard({ label, value }) {
   return (
-    <div className="bg-white border border-green-200 p-4 rounded-lg shadow transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl text-center">
+    <div className="bg-white border border-green-200 p-5 rounded-lg shadow text-center">
       <p className="text-sm text-gray-600">{label}</p>
       <p className="text-3xl font-bold text-[#00843D]">{value}</p>
     </div>
@@ -343,6 +380,7 @@ function ServiceRow({ service, onRename, onDelete, onSetActive }) {
           ) : (
             <span className="text-gray-800">{service.name}</span>
           )}
+
           {service.active && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-[#00843D] border border-green-200">
               Active
@@ -350,7 +388,8 @@ function ServiceRow({ service, onRename, onDelete, onSetActive }) {
           )}
         </div>
       </td>
-      <td className="p-2 sm:p-3 space-x-1 sm:space-x-2 whitespace-nowrap">
+
+      <td className="p-3 whitespace-nowrap space-x-2">
         {editing ? (
           <>
             <button
@@ -394,5 +433,72 @@ function ServiceRow({ service, onRename, onDelete, onSetActive }) {
         )}
       </td>
     </tr>
+  );
+}
+
+/* ---------------- CHARTS ---------------- */
+
+function AverageScoreChart({ data }) {
+  const chartData = data.map((s) => ({
+    name: s.name,
+    average: s.averageScore ? Number(s.averageScore.toFixed(2)) : 0,
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height="90%">
+      <BarChart data={chartData}>
+        <XAxis dataKey="name" />
+        <YAxis domain={[0, 5]} />
+        <Tooltip />
+        <Bar dataKey="average" fill="#00843D" radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function FeedbackTrendChart({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height="90%">
+      <AreaChart data={data}>
+        <XAxis dataKey="date" />
+        <YAxis allowDecimals={false} />
+        <Tooltip />
+        <Area type="monotone" dataKey="count" stroke="#00843D" fill="#12a15030" />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+function RatingPieChart({ service, stats }) {
+  const svc = stats.services.find((s) => s.id === service.id);
+
+  if (!svc || !svc.ratingDistribution) return null;
+
+  const dist = svc.ratingDistribution;
+
+  const data = Object.keys(dist).map((key) => ({
+    name: key,
+    value: dist[key],
+  }));
+
+  const COLORS = ["#00843D", "#4CAF50", "#9CCC65", "#FBC02D", "#E53935"];
+
+  return (
+    <ResponsiveContainer width="100%" height="90%">
+      <PieChart>
+        <Pie
+          data={data}
+          innerRadius={50}
+          outerRadius={80}
+          dataKey="value"
+          paddingAngle={3}
+        >
+          {data.map((entry, index) => (
+            <Cell key={index} fill={COLORS[index]} />
+          ))}
+        </Pie>
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
   );
 }
