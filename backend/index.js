@@ -12,12 +12,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ---------- File “database” setup ----------
+// ---------- File database setup ----------
+
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const feedbacksFile = path.join(dataDir, "feedbacks.json");
-const departmentsFile = path.join(dataDir, "departments.json");
+const servicesFile = path.join(dataDir, "services.json"); // renamed
 
 function ensureFile(filePath, defaultValue) {
   if (!fs.existsSync(filePath)) {
@@ -26,7 +27,7 @@ function ensureFile(filePath, defaultValue) {
 }
 
 ensureFile(feedbacksFile, []);
-ensureFile(departmentsFile, []);
+ensureFile(servicesFile, []);
 
 function readJson(filePath) {
   const raw = fs.readFileSync(filePath, "utf-8");
@@ -37,14 +38,7 @@ function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-// ratings allowed in the app
-const allowedRatings = [
-  "Excellent",
-  "Good",
-  "Neutral",
-  "Satisfying",
-  "Unsatisfying",
-];
+const allowedRatings = ["Excellent", "Good", "Neutral", "Satisfying", "Unsatisfying"];
 
 const ratingWeights = {
   Excellent: 5,
@@ -54,13 +48,11 @@ const ratingWeights = {
   Unsatisfying: 1,
 };
 
-// ---------- Auth middleware ----------
+// ---------- Auth Middleware ----------
+
 function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-  const token = authHeader.split(" ")[1];
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "No token provided" });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -69,180 +61,158 @@ function authMiddleware(req, res, next) {
     }
     req.admin = decoded;
     next();
-  } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+  } catch {
+    return res.status(401).json({ message: "Invalid token" });
   }
 }
 
 // ---------- ROUTES ----------
 
-// health check
+// Health check
 app.get("/", (req, res) => {
-  res.send("Backend working (file-based, no DB)");
+  res.send("Backend working with SERVICES API");
 });
 
-// ---- Admin login ----
+// ---- Admin Login ----
+
 app.post("/api/admin/login", (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res
-      .status(400)
-      .json({ message: "Email and password are required" });
-  }
 
   if (
     email === process.env.ADMIN_EMAIL &&
     password === process.env.ADMIN_PASSWORD
   ) {
-    const token = jwt.sign(
-      { role: "admin", email },
-      process.env.JWT_SECRET,
-      { expiresIn: "2h" }
-    );
+    const token = jwt.sign({ role: "admin", email }, process.env.JWT_SECRET, {
+      expiresIn: "2h",
+    });
     return res.json({ token });
   }
 
-  return res.status(401).json({ message: "Invalid credentials" });
+  res.status(401).json({ message: "Invalid credentials" });
 });
 
-// ---- Departments ----
+// ---- SERVICES CRUD ----
 
-// public: list departments (for admin dashboard, stats, etc.)
-app.get("/api/departments", (req, res) => {
-  const departments = readJson(departmentsFile);
-  res.json(departments);
+// GET all services
+app.get("/api/services", (req, res) => {
+  res.json(readJson(servicesFile));
 });
 
-// public: get active department(s)
-app.get("/api/departments/active", (req, res) => {
-  const departments = readJson(departmentsFile);
-  const active = departments.filter((d) => d.active);
-  res.json(active);
+// GET active service(s)
+app.get("/api/services/active", (req, res) => {
+  const services = readJson(servicesFile);
+  res.json(services.filter((s) => s.active));
 });
 
-// admin: create department
-app.post("/api/departments", authMiddleware, (req, res) => {
+// CREATE service
+app.post("/api/services", authMiddleware, (req, res) => {
   const { name } = req.body;
-  if (!name || !name.trim()) {
-    return res.status(400).json({ message: "Name is required" });
-  }
+  if (!name?.trim()) return res.status(400).json({ message: "Name required" });
 
-  const departments = readJson(departmentsFile);
-  const newDept = {
+  const services = readJson(servicesFile);
+
+  const newService = {
     id: Date.now(),
     name: name.trim(),
-    active: false, // NEW FIELD
+    active: false,
   };
-  departments.push(newDept);
-  writeJson(departmentsFile, departments);
 
-  res.status(201).json(newDept);
+  services.push(newService);
+  writeJson(servicesFile, services);
+
+  res.status(201).json(newService);
 });
 
-// admin: update department
-app.put("/api/departments/:id", authMiddleware, (req, res) => {
+// UPDATE service
+app.put("/api/services/:id", authMiddleware, (req, res) => {
   const { name } = req.body;
   const id = Number(req.params.id);
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ message: "Name is required" });
-  }
+  if (!name?.trim()) return res.status(400).json({ message: "Name required" });
 
-  const departments = readJson(departmentsFile);
-  const index = departments.findIndex((d) => d.id === id);
+  const services = readJson(servicesFile);
+  const index = services.findIndex((s) => s.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ message: "Department not found" });
-  }
+  if (index === -1)
+    return res.status(404).json({ message: "Service not found" });
 
-  departments[index].name = name.trim();
-  writeJson(departmentsFile, departments);
+  services[index].name = name.trim();
+  writeJson(servicesFile, services);
 
-  res.json(departments[index]);
+  res.json(services[index]);
 });
 
-// admin: set active department (only one active at a time)
-app.put("/api/departments/:id/active", authMiddleware, (req, res) => {
+// SET active service
+app.put("/api/services/:id/active", authMiddleware, (req, res) => {
   const id = Number(req.params.id);
-  const departments = readJson(departmentsFile);
+  const { active } = req.body; // 👈 take the value from frontend
+  const services = readJson(servicesFile);
 
   let found = false;
 
-  const updated = departments.map((d) => {
-    if (d.id === id) {
+  const updated = services.map((s) => {
+    if (s.id === id) {
       found = true;
-      return { ...d, active: true };
+      return { ...s, active };  // 👈 set true OR false
     }
-    // make all other departments inactive
-    return { ...d, active: false };
+    return s; // 👈 keep others unchanged
   });
 
-  if (!found) {
-    return res.status(404).json({ message: "Department not found" });
-  }
+  if (!found) return res.status(404).json({ message: "Service not found" });
 
-  writeJson(departmentsFile, updated);
-  const activeDept = updated.find((d) => d.id === id);
-  res.json(activeDept);
+  writeJson(servicesFile, updated);
+  res.json(updated.find((s) => s.id === id));
 });
 
-// ✅ NEW: admin: clear active department (make all inactive)
-app.put("/api/departments/active/clear", authMiddleware, (req, res) => {
-  const departments = readJson(departmentsFile);
-  const updated = departments.map((d) => ({ ...d, active: false }));
-  writeJson(departmentsFile, updated);
-  res.json({ message: "All departments deactivated" });
+// CLEAR all active services
+app.put("/api/services/active/clear", authMiddleware, (req, res) => {
+  const services = readJson(servicesFile);
+  const updated = services.map((s) => ({ ...s, active: false }));
+
+  writeJson(servicesFile, updated);
+  res.json({ message: "All services deactivated" });
 });
 
-// admin: delete department
-app.delete("/api/departments/:id", authMiddleware, (req, res) => {
+// DELETE a service
+app.delete("/api/services/:id", authMiddleware, (req, res) => {
   const id = Number(req.params.id);
 
-  let departments = readJson(departmentsFile);
-  const exists = departments.some((d) => d.id === id);
+  let services = readJson(servicesFile);
 
-  if (!exists) {
-    return res.status(404).json({ message: "Department not found" });
+  if (!services.some((s) => s.id === id)) {
+    return res.status(404).json({ message: "Service not found" });
   }
 
-  departments = departments.filter((d) => d.id !== id);
-  writeJson(departmentsFile, departments);
+  services = services.filter((s) => s.id !== id);
+  writeJson(servicesFile, services);
 
-  // we keep past feedback; in Excel it will show "Unknown"
-  res.json({ message: "Department deleted" });
+  res.json({ message: "Service deleted" });
 });
 
-// ---- Feedback ----
+// ---- FEEDBACK ----
 
-// public: submit feedback
+// Submit feedback
 app.post("/api/feedback", (req, res) => {
-  const { departmentId, rating, comment } = req.body;
+  const { serviceId, rating, comment } = req.body;
 
-  if (!departmentId || !rating) {
-    return res
-      .status(400)
-      .json({ message: "departmentId and rating are required" });
-  }
+  if (!serviceId || !rating)
+    return res.status(400).json({ message: "serviceId and rating required" });
 
-  if (!allowedRatings.includes(rating)) {
-    return res.status(400).json({ message: "Invalid rating value" });
-  }
+  const services = readJson(servicesFile);
 
-  const departments = readJson(departmentsFile);
-  const deptExists = departments.some(
-    (d) => d.id === Number(departmentId)
-  );
-  if (!deptExists) {
-    return res.status(400).json({ message: "Unknown department" });
-  }
+  if (!services.some((s) => s.id === Number(serviceId)))
+    return res.status(400).json({ message: "Unknown service" });
+
+  if (!allowedRatings.includes(rating))
+    return res.status(400).json({ message: "Invalid rating" });
 
   const feedbacks = readJson(feedbacksFile);
 
   const newFeedback = {
     id: Date.now(),
-    departmentId: Number(departmentId),
+    serviceId: Number(serviceId),
     rating,
-    comment: comment?.toString().slice(0, 500) || "",
+    comment: (comment || "").toString().slice(0, 500),
     createdAt: new Date().toISOString(),
   };
 
@@ -252,106 +222,87 @@ app.post("/api/feedback", (req, res) => {
   res.status(201).json({ message: "Feedback saved" });
 });
 
-// admin: list all feedback
+// GET feedback (admin)
 app.get("/api/feedback", authMiddleware, (req, res) => {
-  const feedbacks = readJson(feedbacksFile);
-  res.json(feedbacks);
+  res.json(readJson(feedbacksFile));
 });
 
-// ---- Excel export (admin) ----
+// ---- EXCEL EXPORT ----
+
 app.get("/api/feedback/export", authMiddleware, (req, res) => {
   const feedbacks = readJson(feedbacksFile);
-  const departments = readJson(departmentsFile);
+  const services = readJson(servicesFile);
 
   const rows = feedbacks.map((fb) => {
-    const dept = departments.find((d) => d.id === fb.departmentId);
+    const svc = services.find((s) => s.id === fb.serviceId);
+
     return {
-      "Department Name": dept ? dept.name : "Unknown",
+      "Service Name": svc ? svc.name : "Unknown",
       "Rating Given": fb.rating,
       "Rating Value": ratingWeights[fb.rating] || 0,
-      "Comment (if any)": fb.comment || "",
+      "Comment": fb.comment,
       "Submission Date": new Date(fb.createdAt).toLocaleString(),
     };
   });
 
-  if (rows.length === 0) {
-    rows.push({
-      "Department Name": "",
-      "Rating Given": "",
-      "Rating Value": ratingWeights[fb.rating] || 0,
-      "Comment (if any)": "",
-      "Submission Date": "",
-    });
-  }
-
   const worksheet = XLSX.utils.json_to_sheet(rows);
-  worksheet["!cols"] = [
-    { wch: 25 },
-    { wch: 15 },
-    { wch: 15 },
-    { wch: 50 },
-    { wch: 25 },
-  ];
-
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Feedback");
 
   const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
-  res.setHeader(
-    "Content-Disposition",
-    "attachment; filename=feedback_export.xlsx"
-  );
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  );
+  res.setHeader("Content-Disposition", "attachment; filename=feedback_export.xlsx");
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
   res.send(buffer);
 });
 
-// ---- Stats (admin) ----
+// ---- STATS ----
+
 app.get("/api/stats", authMiddleware, (req, res) => {
   const feedbacks = readJson(feedbacksFile);
-  const departments = readJson(departmentsFile);
+  const services = readJson(servicesFile);
 
   const totalFeedbacks = feedbacks.length;
 
-  const departmentsStats = departments.map((dept) => {
-    const deptFeedbacks = feedbacks.filter(
-      (fb) => fb.departmentId === dept.id
-    );
-    const count = deptFeedbacks.length;
+  const serviceStats = services.map((svc) => {
+    const svcFeedbacks = feedbacks.filter((fb) => fb.serviceId === svc.id);
 
+    const count = svcFeedbacks.length;
     let totalScore = 0;
-    const distribution = {};
-    allowedRatings.forEach((r) => (distribution[r] = 0));
 
-    deptFeedbacks.forEach((fb) => {
-      totalScore += ratingWeights[fb.rating] || 0;
-      distribution[fb.rating] = (distribution[fb.rating] || 0) + 1;
+    const distribution = {
+      Excellent: 0,
+      Good: 0,
+      Neutral: 0,
+      Satisfying: 0,
+      Unsatisfying: 0,
+    };
+
+    svcFeedbacks.forEach((fb) => {
+      totalScore += ratingWeights[fb.rating];
+      distribution[fb.rating]++;
     });
 
-    const averageScore = count > 0 ? totalScore / count : null;
-
     return {
-      id: dept.id,
-      name: dept.name,
+      id: svc.id,
+      name: svc.name,
       feedbackCount: count,
-      averageScore,
+      averageScore: count > 0 ? totalScore / count : null,
       ratingDistribution: distribution,
     };
   });
 
   res.json({
     totalFeedbacks,
-    departments: departmentsStats,
+    services: serviceStats,
   });
 });
 
-// ---------- START SERVER ----------
+// -------- START SERVER --------
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🔥 Services API backend running on port ${PORT}`);
 });

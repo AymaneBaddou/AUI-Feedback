@@ -5,11 +5,14 @@ import { useNavigate } from "react-router-dom";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
-  const [departments, setDepartments] = useState([]);
-  const [newDeptName, setNewDeptName] = useState("");
+
+  // RENAMED
+  const [services, setServices] = useState([]);
+  const [newServiceName, setNewServiceName] = useState("");
+
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [savingDept, setSavingDept] = useState(false);
+  const [savingService, setSavingService] = useState(false);
 
   const navigate = useNavigate();
 
@@ -30,12 +33,13 @@ export default function AdminDashboard() {
 
     const fetchAll = async () => {
       try {
-        const [statsRes, deptsRes] = await Promise.all([
+        const [statsRes, servicesRes] = await Promise.all([
           api.get("/api/stats"),
-          api.get("/api/departments"),
+          api.get("/api/services"),
         ]);
+
         setStats(statsRes.data);
-        setDepartments(deptsRes.data);
+        setServices(servicesRes.data);
       } catch (err) {
         console.error(err);
         setError("Could not load dashboard data.");
@@ -47,73 +51,68 @@ export default function AdminDashboard() {
     fetchAll();
   }, []);
 
-  const handleAddDepartment = async (e) => {
+  const handleAddService = async (e) => {
     e.preventDefault();
-    if (!newDeptName.trim()) return;
+    if (!newServiceName.trim()) return;
     try {
-      setSavingDept(true);
-      const res = await api.post("/api/departments", {
-        name: newDeptName.trim(),
+      setSavingService(true);
+      const res = await api.post("/api/services", {
+        name: newServiceName.trim(),
       });
-      setDepartments((prev) => [...prev, res.data]);
-      setNewDeptName("");
+      setServices((prev) => [...prev, res.data]);
+      setNewServiceName("");
     } catch (err) {
       console.error(err);
-      setError("Could not add department.");
+      setError("Could not add service.");
     } finally {
-      setSavingDept(false);
+      setSavingService(false);
     }
   };
 
-  const handleRenameDepartment = async (id, newName) => {
+  const handleRenameService = async (id, newName) => {
     if (!newName.trim()) return;
     try {
-      const res = await api.put(`/api/departments/${id}`, {
+      const res = await api.put(`/api/services/${id}`, {
         name: newName.trim(),
       });
-      setDepartments((prev) =>
-        prev.map((d) => (d.id === id ? res.data : d))
+      setServices((prev) =>
+        prev.map((s) => (s.id === id ? res.data : s))
       );
     } catch (err) {
       console.error(err);
-      setError("Could not rename department.");
+      setError("Could not rename service.");
     }
   };
 
-  const handleDeleteDepartment = async (id) => {
-    if (!window.confirm("Delete this department?")) return;
+  const handleDeleteService = async (id) => {
+    if (!window.confirm("Delete this service?")) return;
     try {
-      await api.delete(`/api/departments/${id}`);
-      setDepartments((prev) => prev.filter((d) => d.id !== id));
+      await api.delete(`/api/services/${id}`);
+      setServices((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error(err);
-      setError("Could not delete department.");
+      setError("Could not delete service.");
     }
   };
 
-  // TOGGLE active department using a single endpoint:
-  // - if currently inactive => set as sole active
-  // - if currently active   => clear all active
   const handleSetActive = async (id, isActive) => {
     try {
-      await api.put(`/api/departments/${id}/active`, { active: !isActive });
+      await api.put(`/api/services/${id}/active`, { active: !isActive });
 
       if (isActive) {
-        // was active -> now everything inactive
-        setDepartments((prev) =>
-          prev.map((d) => ({ ...d, active: false }))
+        setServices((prev) =>
+          prev.map((s) => ({ ...s, active: false }))
         );
       } else {
-        // was inactive -> this one becomes active, others off
-        setDepartments((prev) =>
-          prev.map((d) =>
-            d.id === id ? { ...d, active: true } : { ...d, active: false }
+        setServices((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, active: true } : { ...s, active: false }
           )
         );
       }
     } catch (err) {
       console.error(err);
-      setError("Could not update active department.");
+      setError("Could not update active service.");
     }
   };
 
@@ -140,7 +139,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const currentActive = departments.find((d) => d.active);
+  const currentActive = services.find((s) => s.active);
 
   if (loading) {
     return (
@@ -177,64 +176,64 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <StatCard label="Total Feedbacks" value={stats.totalFeedbacks} />
-            <StatCard label="Departments" value={stats.departments.length} />
+            <StatCard label="Services" value={stats.services.length} />
             <StatCard
-              label="Departments with Feedback"
+              label="Services with Feedback"
               value={
-                stats.departments.filter((d) => d.feedbackCount > 0).length
+                stats.services.filter((s) => s.feedbackCount > 0).length
               }
             />
           </div>
 
           <h4 className="mt-1 mb-2 font-semibold text-sm text-gray-700">
-            Per Department
+            Per Service
           </h4>
           <ul className="text-sm text-gray-700 space-y-1">
-            {stats.departments.map((d) => (
-              <li key={d.id}>
-                <span className="font-medium">{d.name}</span> –{" "}
-                {d.feedbackCount} feedback(s), avg score:{" "}
-                {d.averageScore ? d.averageScore.toFixed(2) : "N/A"}
+            {stats.services.map((s) => (
+              <li key={s.id}>
+                <span className="font-medium">{s.name}</span> –{" "}
+                {s.feedbackCount} feedback(s), avg score:{" "}
+                {s.averageScore ? s.averageScore.toFixed(2) : "N/A"}
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {/* DEPARTMENTS MANAGEMENT */}
+      {/* SERVICES MANAGEMENT */}
       <section className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-6 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl relative">
         <div className="absolute inset-x-0 -top-1 h-1 bg-[#00843D] rounded-t-lg" />
         <h3 className="text-xl font-semibold text-[#00843D] mb-4">
-          Departments
+          Services
         </h3>
 
         <form
-          onSubmit={handleAddDepartment}
+          onSubmit={handleAddService}
           className="flex flex-col sm:flex-row gap-3 mb-4"
         >
           <input
             type="text"
-            placeholder="New department name"
-            value={newDeptName}
-            onChange={(e) => setNewDeptName(e.target.value)}
+            placeholder="New service name"
+            value={newServiceName}
+            onChange={(e) => setNewServiceName(e.target.value)}
             className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#00843D]"
           />
           <button
             type="submit"
-            disabled={savingDept}
+            disabled={savingService}
             className={`px-4 py-2 rounded text-sm font-medium text-white transition ${
-              savingDept
+              savingService
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#00843D] hover:bg-[#006B31]"
             }`}
           >
-            {savingDept ? "Adding..." : "Add Department"}
+            {savingService ? "Adding..." : "Add Service"}
           </button>
         </form>
 
-        {departments.length === 0 ? (
+        {services.length === 0 ? (
           <p className="text-gray-500 text-sm">
-            No departments yet. Add one above.
+            No services yet. Add one above.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -246,12 +245,12 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {departments.map((dept) => (
-                  <DeptRow
-                    key={dept.id}
-                    dept={dept}
-                    onRename={handleRenameDepartment}
-                    onDelete={handleDeleteDepartment}
+                {services.map((service) => (
+                  <ServiceRow
+                    key={service.id}
+                    service={service}
+                    onRename={handleRenameService}
+                    onDelete={handleDeleteService}
                     onSetActive={handleSetActive}
                   />
                 ))}
@@ -297,7 +296,7 @@ function Header({ logout }) {
             Admin Dashboard
           </h1>
           <p className="text-xs text-gray-600">
-            Manage departments & review feedback for AUI.
+            Manage services & review feedback for AUI.
           </p>
         </div>
       </div>
@@ -320,13 +319,13 @@ function StatCard({ label, value }) {
   );
 }
 
-function DeptRow({ dept, onRename, onDelete, onSetActive }) {
+function ServiceRow({ service, onRename, onDelete, onSetActive }) {
   const [editing, setEditing] = useState(false);
-  const [tempName, setTempName] = useState(dept.name);
+  const [tempName, setTempName] = useState(service.name);
 
   const save = () => {
-    if (tempName.trim() && tempName !== dept.name) {
-      onRename(dept.id, tempName);
+    if (tempName.trim() && tempName !== service.name) {
+      onRename(service.id, tempName);
     }
     setEditing(false);
   };
@@ -342,9 +341,9 @@ function DeptRow({ dept, onRename, onDelete, onSetActive }) {
               className="border border-gray-300 rounded px-2 py-1 w-full text-sm focus:outline-none focus:border-[#00843D]"
             />
           ) : (
-            <span className="text-gray-800">{dept.name}</span>
+            <span className="text-gray-800">{service.name}</span>
           )}
-          {dept.active && (
+          {service.active && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-[#00843D] border border-green-200">
               Active
             </span>
@@ -376,20 +375,20 @@ function DeptRow({ dept, onRename, onDelete, onSetActive }) {
               Edit
             </button>
             <button
-              onClick={() => onDelete(dept.id)}
+              onClick={() => onDelete(service.id)}
               className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
             >
               Delete
             </button>
             <button
-              onClick={() => onSetActive(dept.id, dept.active)}
+              onClick={() => onSetActive(service.id, service.active)}
               className={`px-3 py-1 rounded text-xs border ${
-                dept.active
+                service.active
                   ? "bg-green-100 text-[#00843D] border-green-300 hover:bg-green-200"
                   : "bg-white text-[#00843D] border-[#00843D] hover:bg-green-50"
               }`}
             >
-              {dept.active ? "Deactivate" : "Set Active"}
+              {service.active ? "Deactivate" : "Set Active"}
             </button>
           </>
         )}
