@@ -3,7 +3,8 @@ const jwt = require("jsonwebtoken");
 
 const ALLOWED_ADMIN_EMAILS = [
   "a.baddou@aui.ma",
-  "i.moukhlis@aui.ma" // same as in frontend
+  "i.moukhlis@aui.ma",
+  "a.dafir@aui.ma", // same as in frontend
   // add more if needed
 ];
 

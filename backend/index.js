@@ -101,6 +101,7 @@ app.post("/api/admin/login", (req, res) => {
 const ALLOWED_ADMIN_EMAILS = [
   "a.baddou@aui.ma".toLowerCase(),// put your real admin email(s) here
   "i.moukhlis@aui.ma".toLowerCase(),
+  "a.dafir@aui.ma".toLowerCase(),
   // add more if needed
 ];
 

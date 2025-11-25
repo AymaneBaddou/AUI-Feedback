@@ -7,7 +7,8 @@ import { loginRequest } from "../authConfig";
 
 const ALLOWED_ADMIN_EMAILS = [
   "a.baddou@aui.ma",
-  "i.moukhlis@aui.ma", // your main admin account
+  "i.moukhlis@aui.ma",
+  "a.dafir@aui.ma", // your main admin account
   // add more admin emails if needed
 ];
 
