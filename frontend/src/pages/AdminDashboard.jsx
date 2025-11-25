@@ -119,25 +119,19 @@ export default function AdminDashboard() {
 
   const handleSetActive = async (id, isActive) => {
     try {
-      await api.put(`/api/services/${id}/active`, { active: !isActive });
-
-      // Update UI immediately
-      if (isActive) {
-        setServices((prev) =>
-          prev.map((s) => ({ ...s, active: false }))
-        );
-      } else {
-        setServices((prev) =>
-          prev.map((s) =>
-            s.id === id ? { ...s, active: true } : s
-          )
-        );
-      }
+      // Ask backend to switch activation
+      const res = await api.put(`/api/services/${id}/active`, { active:   !isActive });
+    
+      // Backend already returns the updated state — reload services
+      const updated = await api.get("/api/services");
+      setServices(updated.data);
+    
     } catch (err) {
       console.error(err);
       setError("Could not update active service.");
     }
   };
+
 
   const handleDownloadExcel = async () => {
     try {
@@ -216,39 +210,6 @@ export default function AdminDashboard() {
         </section>
       )}
 
-      {/* ---------------- ANALYTICS ---------------- */}
-      {stats && (
-        <section className="w-full bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
-          <div className="h-1 w-full bg-[#00843D] rounded-t-lg -mt-6 mb-4"></div>
-
-          <h3 className="text-xl font-semibold text-[#00843D] mb-4">Analytics</h3>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-
-            {/* AVERAGE SCORE */}
-            <div className="bg-gray-50 p-6 rounded-lg border h-[360px]">
-              <h4 className="text-sm font-semibold text-gray-700 mb-4">Average Score per Service</h4>
-              <AverageScoreChart data={stats.services} />
-            </div>
-
-            {/* FEEDBACK TREND */}
-            <div className="bg-gray-50 p-6 rounded-lg border h-[360px]">
-              <h4 className="text-sm font-semibold text-gray-700 mb-4">Feedback Trend (per Date)</h4>
-              <FeedbackTrendChart data={feedbackTrend} />
-            </div>
-          </div>
-
-          {currentActive && (
-            <div className="mt-10 bg-gray-50 p-6 rounded-lg border max-w-lg mx-auto h-[360px]">
-              <h4 className="text-sm font-semibold text-gray-700 mb-4">
-                Rating Distribution — {currentActive.name}
-              </h4>
-              <RatingPieChart service={currentActive} stats={stats} />
-            </div>
-          )}
-        </section>
-      )}
-
       {/* ---------------- SERVICES SECTION ---------------- */}
       <section className="w-full bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
         <div className="h-1 w-full bg-[#00843D] rounded-t-lg -mt-6 mb-4"></div>
@@ -269,11 +230,10 @@ export default function AdminDashboard() {
           <button
             type="submit"
             disabled={savingService}
-            className={`px-4 py-2 rounded text-sm font-medium text-white transition ${
-              savingService
+            className={`px-4 py-2 rounded text-sm font-medium text-white transition ${savingService
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#00843D] hover:bg-[#006B31]"
-            }`}
+              }`}
           >
             {savingService ? "Adding..." : "Add Service"}
           </button>
@@ -421,11 +381,10 @@ function ServiceRow({ service, onRename, onDelete, onSetActive }) {
             </button>
             <button
               onClick={() => onSetActive(service.id, service.active)}
-              className={`px-3 py-1 rounded text-xs border ${
-                service.active
+              className={`px-3 py-1 rounded text-xs border ${service.active
                   ? "bg-green-100 text-[#00843D] border-green-300 hover:bg-green-200"
                   : "bg-white text-[#00843D] border-[#00843D] hover:bg-green-50"
-              }`}
+                }`}
             >
               {service.active ? "Deactivate" : "Set Active"}
             </button>
@@ -433,72 +392,5 @@ function ServiceRow({ service, onRename, onDelete, onSetActive }) {
         )}
       </td>
     </tr>
-  );
-}
-
-/* ---------------- CHARTS ---------------- */
-
-function AverageScoreChart({ data }) {
-  const chartData = data.map((s) => ({
-    name: s.name,
-    average: s.averageScore ? Number(s.averageScore.toFixed(2)) : 0,
-  }));
-
-  return (
-    <ResponsiveContainer width="100%" height="90%">
-      <BarChart data={chartData}>
-        <XAxis dataKey="name" />
-        <YAxis domain={[0, 5]} />
-        <Tooltip />
-        <Bar dataKey="average" fill="#00843D" radius={[6, 6, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function FeedbackTrendChart({ data }) {
-  return (
-    <ResponsiveContainer width="100%" height="90%">
-      <AreaChart data={data}>
-        <XAxis dataKey="date" />
-        <YAxis allowDecimals={false} />
-        <Tooltip />
-        <Area type="monotone" dataKey="count" stroke="#00843D" fill="#12a15030" />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-function RatingPieChart({ service, stats }) {
-  const svc = stats.services.find((s) => s.id === service.id);
-
-  if (!svc || !svc.ratingDistribution) return null;
-
-  const dist = svc.ratingDistribution;
-
-  const data = Object.keys(dist).map((key) => ({
-    name: key,
-    value: dist[key],
-  }));
-
-  const COLORS = ["#00843D", "#4CAF50", "#9CCC65", "#FBC02D", "#E53935"];
-
-  return (
-    <ResponsiveContainer width="100%" height="90%">
-      <PieChart>
-        <Pie
-          data={data}
-          innerRadius={50}
-          outerRadius={80}
-          dataKey="value"
-          paddingAngle={3}
-        >
-          {data.map((entry, index) => (
-            <Cell key={index} fill={COLORS[index]} />
-          ))}
-        </Pie>
-        <Tooltip />
-      </PieChart>
-    </ResponsiveContainer>
   );
 }

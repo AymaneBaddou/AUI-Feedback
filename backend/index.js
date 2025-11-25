@@ -48,23 +48,77 @@ const ratingWeights = {
   Unsatisfying: 1,
 };
 
-// ---------- Auth Middleware ----------
+// ---------- Auth middleware ----------
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key";
 
 function authMiddleware(req, res, next) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "No token provided" });
+  const header = req.headers.authorization || "";
+  const [, token] = header.split(" ");
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") {
-      return res.status(403).json({ message: "Not allowed" });
-    }
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.admin = decoded;
     next();
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid or expired token" });
   }
 }
+
+// ---------- Admin login (email/password, optional) ----------
+
+const HARDCODED_ADMIN = {
+  email: process.env.ADMIN_EMAIL || "admin@aui.ma",
+  password: process.env.ADMIN_PASSWORD || "password123",
+};
+
+app.post("/api/admin/login", (req, res) => {
+  const { email, password } = req.body;
+
+  if (
+    email !== HARDCODED_ADMIN.email ||
+    password !== HARDCODED_ADMIN.password
+  ) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
+
+  const token = jwt.sign(
+    { role: "admin", email },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+
+  res.json({ token });
+});
+
+// ---------- Admin login with Microsoft 365 ----------
+// Called from React after MSAL loginPopup succeeds
+
+const ALLOWED_ADMIN_EMAILS = [
+  "email@aui.ma".toLowerCase(),// put your real admin email(s) here
+  // add more if needed
+];
+
+app.post("/api/admin/microsoft-login", (req, res) => {
+  const { email } = req.body;
+  const normalized = (email || "").toLowerCase();
+
+  if (!ALLOWED_ADMIN_EMAILS.includes(normalized)) {
+    return res.status(401).json({ message: "Not authorized as admin" });
+  }
+
+  const token = jwt.sign(
+    { role: "admin", email: normalized },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+
+  res.json({ token });
+});
 
 // ---------- ROUTES ----------
 
@@ -145,23 +199,33 @@ app.put("/api/services/:id", authMiddleware, (req, res) => {
 // SET active service
 app.put("/api/services/:id/active", authMiddleware, (req, res) => {
   const id = Number(req.params.id);
-  const { active } = req.body; // 👈 take the value from frontend
-  const services = readJson(servicesFile);
+  const { active } = req.body; // true or false
+  let services = readJson(servicesFile);
 
   let found = false;
 
-  const updated = services.map((s) => {
-    if (s.id === id) {
-      found = true;
-      return { ...s, active };  // 👈 set true OR false
-    }
-    return s; // 👈 keep others unchanged
-  });
+  // If user deactivates → everything becomes inactive
+  if (active === false) {
+    found = services.some(s => s.id === id);
+    services = services.map(s => ({ ...s, active: false }));
+  } 
+  else {
+    // If user activates → ONLY this one becomes active
+    services = services.map((s) => {
+      if (s.id === id) {
+        found = true;
+        return { ...s, active: true };
+      }
+      return { ...s, active: false };
+    });
+  }
 
-  if (!found) return res.status(404).json({ message: "Service not found" });
+  if (!found) 
+    return res.status(404).json({ message: "Service not found" });
 
-  writeJson(servicesFile, updated);
-  res.json(updated.find((s) => s.id === id));
+  writeJson(servicesFile, services);
+
+  res.json(services.find((s) => s.id === id));
 });
 
 // CLEAR all active services

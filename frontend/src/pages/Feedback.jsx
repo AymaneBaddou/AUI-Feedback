@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import api from "../api";
 
-// 🌍 TRANSLATION DICTIONARY (updated to use “service” instead of “department”)
+// 🌍 TRANSLATION DICTIONARY
 const translations = {
   en: {
     giveFeedback: "Give Feedback",
@@ -45,7 +45,7 @@ const translations = {
     submit: "إرسال الملاحظات",
     submitting: "جارٍ الإرسال...",
     thankYou: "شكراً لك!",
-    thankYouSub: "تم إرسال ملاحظاتك بنجاح وبشكل مجهول الهوية.",
+    thankYouSub: "تم إرسال ملاحظاتك بنجاح وبشكل مجهول الهوية",
     submitAnother: "إرسال ملاحظة أخرى",
     loading: "جاري تحميل الخدمة...",
     noService: "لا توجد خدمة تستقبل الملاحظات حالياً. يرجى المحاولة لاحقاً.",
@@ -79,23 +79,42 @@ export default function Feedback() {
   const [lang, setLang] = useState("en");
   const t = translations[lang];
 
+  // 🔄 Auto-refresh active service every 2 seconds
   useEffect(() => {
+    let isMounted = true;
+
     const fetchActiveService = async () => {
       try {
-        // UPDATED to new backend route
         const res = await api.get("/api/services/active");
+        if (!isMounted) return;
 
         const list = res.data || [];
-        setActiveService(list[0] || null);
+        const newActive = list[0] || null;
+
+        setActiveService(prev =>
+          !prev || !newActive || prev.id !== newActive.id ? newActive : prev
+        );
       } catch {
-        setError(t.noActiveService);
+        if (isMounted) setError(t.noActiveService);
       } finally {
-        setLoadingService(false);
+        if (isMounted) setLoadingService(false);
       }
     };
 
     fetchActiveService();
+    const interval = setInterval(fetchActiveService, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [lang]);
+
+  // 🔄 Reset rating + comment whenever admin switches active service
+  useEffect(() => {
+    setRating("");
+    setComment("");
+  }, [activeService]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -109,7 +128,7 @@ export default function Feedback() {
       setSubmitting(true);
 
       await api.post("/api/feedback", {
-        serviceId: activeService.id, // FINAL correct field
+        serviceId: activeService.id,
         rating,
         comment,
       });
@@ -125,31 +144,65 @@ export default function Feedback() {
   };
 
   // ⭐ Thank-you page
-  if (message) {
-    return (
-      <motion.div
-        className="max-w-2xl mx-auto min-h-screen flex items-center justify-center px-4 text-center"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="bg-white p-20 rounded-lg shadow border">
-          <h2 className="text-3xl font-bold text-[#00843D] mb-4">
-            {t.thankYou}
-          </h2>
+if (message) {
+  return (
+    <motion.div
+      className="max-w-2xl mx-auto min-h-screen flex items-center justify-center px-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: "easeOut" }}
+    >
+      <div className="bg-white p-10 md:p-16 rounded-2xl shadow-xl border text-center relative overflow-hidden">
 
-          <p className="text-lg text-gray-700">{t.thankYouSub}</p>
+        {/* Success Icon */}
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, type: "spring", stiffness: 120 }}
+          className="mx-auto w-24 h-24 rounded-full bg-[#00843D]/10 text-[#00843D] flex items-center justify-center text-5xl mb-6"
+        >
+          ✓
+        </motion.div>
 
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-2 bg-[#00843D] text-white rounded hover:bg-[#006B31]"
-          >
-            {t.submitAnother}
-          </button>
-        </div>
-      </motion.div>
-    );
-  }
+        {/* Title */}
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="text-4xl font-bold text-[#00843D] mb-3"
+        >
+          {t.thankYou}
+        </motion.h2>
+
+        {/* Subtitle */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="text-gray-600 text-lg mb-8 max-w-md mx-auto"
+        >
+          {t.thankYouSub}
+        </motion.p>
+
+        {/* Divider */}
+        <div className="h-[1px] w-full bg-gray-200 mb-8"></div>
+
+        {/* Submit Another */}
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
+          onClick={() => window.location.reload()}
+          className="px-8 py-3 bg-[#00843D] text-white text-sm font-medium rounded-lg hover:bg-[#006B31] transition shadow-md"
+        >
+          {t.submitAnother}
+        </motion.button>
+
+      </div>
+    </motion.div>
+  );
+}
+
 
   const dir = lang === "ar" ? "rtl" : "ltr";
 
@@ -180,18 +233,16 @@ export default function Feedback() {
         <div className={`absolute top-4 ${lang === "ar" ? "left-4" : "right-4"} flex space-x-2`}>
           <button
             onClick={() => setLang("en")}
-            className={`text-xs px-2 py-1 rounded-full font-medium ${
-              lang === "en" ? "bg-[#00843D] text-white" : "bg-gray-100 text-gray-700"
-            }`}
+            className={`text-xs px-2 py-1 rounded-full font-medium ${lang === "en" ? "bg-[#00843D] text-white" : "bg-gray-100 text-gray-700"
+              }`}
           >
             English
           </button>
 
           <button
             onClick={() => setLang("ar")}
-            className={`text-xs px-2 py-1 rounded-full ${
-              lang === "ar" ? "bg-[#00843D] text-white" : "bg-gray-100 text-gray-700"
-            }`}
+            className={`text-xs px-2 py-1 rounded-full ${lang === "ar" ? "bg-[#00843D] text-white" : "bg-gray-100 text-gray-700"
+              }`}
           >
             العربية
           </button>
@@ -222,8 +273,27 @@ export default function Feedback() {
 
         {loadingService && <p className="text-gray-500">{t.loading}</p>}
 
+        {/* ⭐ Friendly empty-state screen */}
         {!loadingService && !activeService && (
-          <p className="text-yellow-700 mb-3">{t.noService}</p>
+          <div className="w-full flex flex-col items-center text-center py-12 px-4">
+            <div className="bg-[#00843D]/10 text-[#00843D] w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
+              🛈
+            </div>
+
+            <h3 className="text-xl font-semibold text-[#00843D] mb-2">
+              {t.noActiveService}
+            </h3>
+
+            <p className="text-gray-600 max-w-md text-sm mb-6">
+              The admin has not activated any service for feedback yet.
+              Please check back later — this page will update automatically
+              once a service becomes active.
+            </p>
+
+            <div className="animate-pulse text-sm text-gray-500">
+              Waiting for an active service…
+            </div>
+          </div>
         )}
 
         {error && (
@@ -232,87 +302,102 @@ export default function Feedback() {
           </div>
         )}
 
-        {/* Rating */}
-        <form onSubmit={handleSubmit} className="space-y-5 mt-2">
-          <label className="block text-sm font-medium text-gray-700">
-            {t.howSatisfied}
-          </label>
+        {/* ⭐ Show FORM ONLY if a service is active */}
+        {activeService && (
+          <form onSubmit={handleSubmit} className="space-y-5 mt-2">
 
-          <div className="flex justify-between flex-wrap gap-3">
-            {ratingOptions.map((opt) => {
-              const isSelected = rating === opt.value;
+            {/* Rating */}
+            <label className="block text-sm font-medium text-gray-700">
+              {t.howSatisfied}
+            </label>
 
-              const translatedKey = Object.keys(translations.en).find(
-                (key) => translations.en[key] === opt.label
-              );
+            <div className="flex justify-between flex-wrap gap-3">
+              {ratingOptions.map((opt) => {
+                const isSelected = rating === opt.value;
 
-              const displayLabel = translatedKey ? t[translatedKey] : opt.label;
+                const translatedKey = Object.keys(translations.en).find(
+                  (key) => translations.en[key] === opt.label
+                );
 
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setRating(opt.value)}
-                  className="group relative flex flex-col items-center flex-1 min-w-[60px]"
-                >
-                  {/* Hover label */}
-                  <div
-                    className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-white text-[10px]
-                               opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all"
+                const displayLabel = translatedKey ? t[translatedKey] : opt.label;
+
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => activeService && setRating(opt.value)}
+                    disabled={!activeService}
+                    className={`group relative flex flex-col items-center flex-1 min-w-[60px]
+                      ${!activeService ? "opacity-40 cursor-not-allowed" : ""}
+                    `}
                   >
-                    {displayLabel}
-                  </div>
+                    {/* Hover label */}
+                    <div
+                      className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-white text-[10px]
+                                 opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all"
+                    >
+                      {displayLabel}
+                    </div>
 
-                  <div
-                    className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl
-                    ${opt.color} text-white transition ${
-                      isSelected ? "ring-4 ring-[#00843D] scale-110 shadow-lg" : "shadow"
-                    }`}
-                  >
-                    {opt.emoji}
-                  </div>
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl
+                      ${opt.color} text-white transition 
+                      ${isSelected ? "ring-4 ring-[#00843D] scale-110 shadow-lg" : "shadow"}
+                      `}
+                    >
+                      {opt.emoji}
+                    </div>
 
-                  <span className="mt-2 text-[10px] text-gray-600">
-                    {displayLabel}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    <span className="mt-2 text-[10px] text-gray-600">
+                      {displayLabel}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-          {selectedLabel && (
-            <p className="mt-2 text-xs text-gray-600">
-              {t.youSelected}{" "}
-              <span className="font-semibold text-[#00843D]">{selectedLabel}</span>
+            {selectedLabel && (
+              <p className="mt-2 text-xs text-gray-600">
+                {t.youSelected}{" "}
+                <span className="font-semibold text-[#00843D]">{selectedLabel}</span>
+              </p>
+            )}
+
+            {/* Comment */}
+            <label className="block text-sm font-medium text-gray-700">
+              {t.commentOptional}
+            </label>
+
+            <textarea
+              rows={4}
+              maxLength={MAX_COMMENT}
+              placeholder={t.placeholder}
+              className={`w-full border rounded px-3 py-2 text-sm
+                ${!activeService ? "bg-gray-100 cursor-not-allowed" : ""}
+              `}
+              value={comment}
+              onChange={(e) => activeService && setComment(e.target.value)}
+              disabled={!activeService}
+            />
+
+            <p className="text-xs text-gray-400 text-right">
+              {comment.length}/{MAX_COMMENT}
             </p>
-          )}
 
-          {/* Comment */}
-          <label className="block text-sm font-medium text-gray-700">
-            {t.commentOptional}
-          </label>
-
-          <textarea
-            rows={4}
-            maxLength={MAX_COMMENT}
-            placeholder={t.placeholder}
-            className="w-full border rounded px-3 py-2 text-sm"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
-
-          <p className="text-xs text-gray-400 text-right">
-            {comment.length}/{MAX_COMMENT}
-          </p>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-2 rounded text-sm text-white bg-[#00843D] hover:bg-[#006B31]"
-          >
-            {submitting ? t.submitting : t.submit}
-          </button>
-        </form>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={submitting || !activeService}
+              className={`w-full py-2 rounded text-sm text-white transition 
+                ${!activeService
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#00843D] hover:bg-[#006B31]"}
+              `}
+            >
+              {submitting ? t.submitting : t.submit}
+            </button>
+          </form>
+        )}
       </div>
     </motion.div>
   );
