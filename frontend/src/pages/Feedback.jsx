@@ -1,3 +1,6 @@
+/* MOBILE-OPTIMIZED FULL FEEDBACK.JSX */
+/* — Updated based on the file you uploaded — */
+
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api";
@@ -59,7 +62,7 @@ const translations = {
   },
 };
 
-// Rating options
+// ⭐ Rating options
 const ratingOptions = [
   { value: "Excellent", label: "Very Satisfied", color: "bg-green-500", emoji: "😄" },
   { value: "Good", label: "Satisfied", color: "bg-lime-400", emoji: "🙂" },
@@ -85,7 +88,7 @@ export default function Feedback() {
   const [lang, setLang] = useState("en");
   const t = translations[lang];
 
-  // 🌱 Smooth fade settings
+  // Fade animation
   const fade = {
     initial: { opacity: 0, y: 10 },
     animate: { opacity: 1, y: 0 },
@@ -93,7 +96,7 @@ export default function Feedback() {
     transition: { duration: 0.25 },
   };
 
-  // 🔄 FETCH services + auto-reload logic
+  // Fetch Active Services
   useEffect(() => {
     let mounted = true;
 
@@ -105,11 +108,7 @@ export default function Feedback() {
         const list = res.data || [];
         setActiveServices(list);
 
-        // ===============================
-        // ⭐ AUTO-RELOAD / AUTO-RESET LOGIC
-        // ===============================
-
-        // CASE A — Only 1 service → auto-select it
+        // Auto-select if only one
         if (list.length === 1) {
           if (!selectedService || selectedService.id !== list[0].id) {
             setSelectedService(list[0]);
@@ -118,14 +117,7 @@ export default function Feedback() {
           }
         }
 
-        // CASE B — More than 1 service → force user to pick again
-        if (selectedService && !list.some(s => s.id === selectedService.id)) {
-          setSelectedService(null);
-          setRating("");
-          setComment("");
-        } 
-
-        // CASE C — Selected service is now inactive → reset
+        // Reset if service disappears
         if (selectedService && !list.some(s => s.id === selectedService.id)) {
           setSelectedService(null);
           setRating("");
@@ -148,13 +140,13 @@ export default function Feedback() {
     };
   }, [lang, selectedService]);
 
-  // Reset rating/comment when switching service
   useEffect(() => {
     setRating("");
     setComment("");
   }, [selectedService]);
 
 
+  // Submit feedback
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -183,10 +175,7 @@ export default function Feedback() {
     }
   };
 
-
-  // **********************
-  // ⭐ THANK-YOU SCREEN
-  // **********************
+  // ⭐ THANK YOU SCREEN
   if (message) {
     return (
       <AnimatePresence>
@@ -223,11 +212,7 @@ export default function Feedback() {
     );
   }
 
-
-  // **********************
   // ⭐ MAIN SCREEN
-  // **********************
-
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   const selectedLabel = (() => {
@@ -241,21 +226,20 @@ export default function Feedback() {
     return translatedKey ? t[translatedKey] : option.label;
   })();
 
-
   return (
     <motion.div
-      className="w-full max-w-7xl mx-auto pt-16 pb-10 px-4"
+      className="w-full max-w-7xl mx-auto pt-14 pb-10 px-3 sm:px-4"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="bg-white p-6 md:p-10 rounded-xl shadow-lg border relative" dir={dir}>
+      <div className="bg-white p-4 sm:p-6 md:p-10 rounded-xl shadow-lg border relative" dir={dir}>
 
-        {/* Language Switch */}
-        <div className={`absolute top-4 ${lang === "ar" ? "left-4" : "right-4"} flex space-x-2`}>
+        {/* 🌍 Language Switch */}
+        <div className={`absolute top-3 ${lang === "ar" ? "left-4" : "right-4"} flex space-x-2`}>
           <button
             onClick={() => setLang("en")}
-            className={`text-xs px-2 py-1 rounded-full font-medium ${
+            className={`text-[10px] sm:text-xs px-2 py-1 rounded-full font-medium ${
               lang === "en" ? "bg-[#00843D] text-white" : "bg-gray-100 text-gray-700"
             }`}
           >
@@ -264,50 +248,51 @@ export default function Feedback() {
 
           <button
             onClick={() => setLang("ar")}
-            className={`text-xs px-4 py-1.5 rounded-full ${
+            className={`text-[10px] sm:text-xs px-3 py-1.5 rounded-full ${
               lang === "ar" ? "bg-[#00843D] text-white" : "bg-gray-100 text-gray-700"
             }`}
           >
             العربية
           </button>
         </div>
-        
-        {/* Back Button aligned with language buttons */}
-{activeServices.length > 1 && selectedService && (
-  <motion.button
-    {...fade}
-    onClick={() => setSelectedService(null)}
-    className={`absolute top-4 ${
-      lang === "ar" ? "right-4" : "left-4"
-    } inline-flex items-center gap-2 
-       px-4 py-1.5 rounded-full
-       bg-white text-[#00843D] border border-[#00843D]/30
-       shadow-sm hover:shadow-md
-       hover:bg-[#00843D]/10 transition-all`}
-  >
-    <span className="text-lg">←</span>
-    <span className="text-sm font-medium">{t.back}</span>
-  </motion.button>
-)}
+
+        {/* 🔙 Back Button */}
+        {activeServices.length > 1 && selectedService && (
+          <motion.button
+            {...fade}
+            onClick={() => setSelectedService(null)}
+            className={`absolute top-3 ${
+              lang === "ar" ? "right-4" : "left-4"
+            } inline-flex items-center gap-2 
+            px-3 py-1.5 rounded-full
+            bg-white text-[#00843D] border border-[#00843D]/30
+            shadow-sm hover:shadow-md hover:bg-[#00843D]/10 
+            transition-all text-xs sm:text-sm`}
+          >
+            <span className="text-sm sm:text-base">←</span>
+            {t.back}
+          </motion.button>
+        )}
 
         {/* Green Line */}
         <div className="absolute inset-x-0 -top-1 h-1 bg-[#00843D]" />
 
         {/* Title */}
-        <h2 className="text-3xl font-semibold text-[#00843D] mt-10 mb-1">
-  {t.giveFeedback}
-</h2>
-<p className="text-gray-600 mb-6 text-sm md:text-base">
-  {t.description}
-</p>
+        <h2 className="text-2xl sm:text-3xl font-semibold text-[#00843D] mt-10 mb-1">
+          {t.giveFeedback}
+        </h2>
 
+        <p className="text-gray-600 mb-6 text-xs sm:text-sm md:text-base">
+          {t.description}
+        </p>
 
+        {/* Pages Switch */}
         <AnimatePresence mode="wait">
 
-          {/* ⭐ SERVICE SELECTION SCREEN */}
+          {/* ⭐ SERVICE SELECTION */}
           {!loading && activeServices.length > 1 && !selectedService && (
             <motion.div key="service-select" {...fade}>
-              <h3 className="text-xl font-semibold text-gray-700 mb-3">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-3">
                 {t.chooseService}
               </h3>
 
@@ -316,7 +301,7 @@ export default function Feedback() {
                   <button
                     key={service.id}
                     onClick={() => setSelectedService(service)}
-                    className="p-6 bg-gray-50 border rounded-xl shadow hover:shadow-md transition text-left hover:bg-gray-100"
+                    className="p-4 sm:p-6 bg-gray-50 border rounded-xl shadow hover:shadow-md transition text-left hover:bg-gray-100"
                   >
                     <p className="text-lg font-semibold text-[#00843D]">{service.name}</p>
                   </button>
@@ -325,12 +310,11 @@ export default function Feedback() {
             </motion.div>
           )}
 
-          {/* ⭐ RATING FORM */}
+          {/* ⭐ RATING */}
           {selectedService && (
-            <motion.div key="form" {...fade} className="mt-6">
+            <motion.div key="form" {...fade} className="mt-4 sm:mt-6">
 
-
-              <p className="text-xl md:text-2xl text-gray-700 mb-2">
+              <p className="text-lg sm:text-2xl text-gray-700 mb-2">
                 {t.ratingYouAreGiving}{" "}
                 <span className="font-semibold text-[#00843D]">{selectedService.name}</span>
               </p>
@@ -338,18 +322,19 @@ export default function Feedback() {
               <div className="border-t border-gray-200 mt-2 mb-4" />
 
               {error && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">
+                <div className="text-xs sm:text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">
                   {error}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5 mt-2">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
 
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">
                   {t.howSatisfied}
                 </label>
 
-                <div className="flex justify-between flex-wrap gap-3">
+                {/* ⭐ RESPONSIVE EMOJI GRID */}
+                <div className="flex justify-center sm:justify-between flex-wrap gap-4 sm:gap-3">
                   {ratingOptions.map((opt) => {
                     const isSelected = rating === opt.value;
 
@@ -364,26 +349,25 @@ export default function Feedback() {
                         key={opt.value}
                         type="button"
                         onClick={() => setRating(opt.value)}
-                        className="group relative flex flex-col items-center flex-1 min-w-[60px]"
+                        className="group relative flex flex-col items-center flex-1 min-w-[55px]"
                       >
                         <div
-                          className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-white text-[10px]
-                          opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all"
+                          className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-black text-white text-[9px]
+                            opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all"
                         >
                           {displayLabel}
                         </div>
 
                         <motion.div
-                          className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl
+                          className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-xl sm:text-2xl
                             ${opt.color} text-white transition 
-                            ${isSelected ? "ring-4 ring-[#00843D] scale-110 shadow-lg" : "shadow"}
-                          `}
+                            ${isSelected ? "ring-4 ring-[#00843D] scale-110 shadow-lg" : "shadow"}`}
                           whileTap={{ scale: 0.9 }}
                         >
                           {opt.emoji}
                         </motion.div>
 
-                        <span className="mt-2 text-[10px] text-gray-600">
+                        <span className="mt-1 text-[9px] sm:text-[10px] text-gray-600">
                           {displayLabel}
                         </span>
                       </button>
@@ -392,13 +376,13 @@ export default function Feedback() {
                 </div>
 
                 {selectedLabel && (
-                  <p className="mt-2 text-xs text-gray-600">
+                  <p className="mt-1 text-xs text-gray-600">
                     {t.youSelected}{" "}
                     <span className="font-semibold text-[#00843D]">{selectedLabel}</span>
                   </p>
                 )}
 
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">
                   {t.commentOptional}
                 </label>
 
@@ -406,21 +390,20 @@ export default function Feedback() {
                   rows={4}
                   maxLength={MAX_COMMENT}
                   placeholder={t.placeholder}
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="w-full border rounded px-3 py-2 text-sm sm:text-base"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 />
 
-                <p className="text-xs text-gray-400 text-right">
+                <p className="text-[10px] sm:text-xs text-gray-400 text-right">
                   {comment.length}/{MAX_COMMENT}
                 </p>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className={`w-full py-2 rounded text-sm text-white transition 
-                    ${submitting ? "bg-gray-400" : "bg-[#00843D] hover:bg-[#006B31]"}
-                  `}
+                  className={`w-full py-3 sm:py-2 rounded text-sm sm:text-base text-white transition 
+                    ${submitting ? "bg-gray-400" : "bg-[#00843D] hover:bg-[#006B31]"}`}
                 >
                   {submitting ? t.submitting : t.submit}
                 </button>
@@ -428,9 +411,8 @@ export default function Feedback() {
             </motion.div>
           )}
 
-          {/* ⭐ LOADING SCREEN */}
           {loading && activeServices.length === 0 && (
-            <motion.p key="loading" {...fade} className="text-gray-500">
+            <motion.p key="loading" {...fade} className="text-gray-500 text-center">
               {t.loading}
             </motion.p>
           )}
@@ -440,3 +422,4 @@ export default function Feedback() {
     </motion.div>
   );
 }
+
