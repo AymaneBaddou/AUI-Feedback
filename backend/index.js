@@ -99,7 +99,8 @@ app.post("/api/admin/login", (req, res) => {
 // Called from React after MSAL loginPopup succeeds
 
 const ALLOWED_ADMIN_EMAILS = [
-  "email@aui.ma".toLowerCase(),// put your real admin email(s) here
+  "a.baddou@aui.ma".toLowerCase(),// put your real admin email(s) here
+  "i.moukhlis@aui.ma".toLowerCase(),
   // add more if needed
 ];
 
@@ -199,33 +200,19 @@ app.put("/api/services/:id", authMiddleware, (req, res) => {
 // SET active service
 app.put("/api/services/:id/active", authMiddleware, (req, res) => {
   const id = Number(req.params.id);
-  const { active } = req.body; // true or false
+  const { active } = req.body;
+
   let services = readJson(servicesFile);
 
-  let found = false;
-
-  // If user deactivates → everything becomes inactive
-  if (active === false) {
-    found = services.some(s => s.id === id);
-    services = services.map(s => ({ ...s, active: false }));
-  } 
-  else {
-    // If user activates → ONLY this one becomes active
-    services = services.map((s) => {
-      if (s.id === id) {
-        found = true;
-        return { ...s, active: true };
-      }
-      return { ...s, active: false };
-    });
-  }
-
-  if (!found) 
+  const index = services.findIndex((s) => s.id === id);
+  if (index === -1)
     return res.status(404).json({ message: "Service not found" });
+
+  services[index].active = !!active; // toggle true/false only this service
 
   writeJson(servicesFile, services);
 
-  res.json(services.find((s) => s.id === id));
+  res.json(services[index]);
 });
 
 // CLEAR all active services

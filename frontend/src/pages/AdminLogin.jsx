@@ -6,8 +6,8 @@ import api, { setAuthToken } from "../api";
 import { loginRequest } from "../authConfig";
 
 const ALLOWED_ADMIN_EMAILS = [
-  "email@aui.ma",
-   // your main admin account
+  "a.baddou@aui.ma",
+  "i.moukhlis@aui.ma", // your main admin account
   // add more admin emails if needed
 ];
 
