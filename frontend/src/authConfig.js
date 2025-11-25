@@ -2,13 +2,14 @@ import { LogLevel } from "@azure/msal-browser";
 
 export const msalConfig = {
   auth: {
-    clientId: "23cd335f-5fe8-4395-b8b5-001eb3fa908b", // from Azure App Registration
+    clientId: "23cd335f-5fe8-4395-b8b5-001eb3fa908b",
     authority: "https://login.microsoftonline.com/7025e04c-70ca-48bf-ab7b-73954cb846ad",
-    // Use the URL where your frontend runs (Vite is usually 5173)
-    redirectUri: "http://localhost:5173",
+
+    // AUTO-DETECT redirect for localhost or Render
+    redirectUri: window.location.origin,
   },
   cache: {
-    cacheLocation: "localStorage", // keeps you logged in if you refresh
+    cacheLocation: "localStorage",
     storeAuthStateInCookie: false,
   },
   system: {
@@ -23,5 +24,5 @@ export const msalConfig = {
 };
 
 export const loginRequest = {
-  scopes: ["User.Read"], // basic profile info
+  scopes: ["User.Read"],
 };
