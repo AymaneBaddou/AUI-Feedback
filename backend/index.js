@@ -105,7 +105,8 @@ app.post("/api/admin/login", (req, res) => {
 // ---- Admin Login (Microsoft 365) ----
 
 const ALLOWED_ADMIN_EMAILS = [
-  "a.baddou@aui.ma".toLowerCase(), // Ensure this matches your real Microsoft email
+  "a.baddou@aui.ma".toLowerCase(),
+  "i.moukhlis@aui.ma".toLowerCase(),
   // Add other admins here if needed
 ];
 
