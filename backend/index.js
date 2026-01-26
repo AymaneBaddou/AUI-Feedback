@@ -18,7 +18,7 @@ const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const feedbacksFile = path.join(dataDir, "feedbacks.json");
-const servicesFile = path.join(dataDir, "services.json"); // renamed
+const servicesFile = path.join(dataDir, "services.json");
 
 function ensureFile(filePath, defaultValue) {
   if (!fs.existsSync(filePath)) {
@@ -69,7 +69,14 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// ---------- Admin login (email/password, optional) ----------
+// ---------- ROUTES ----------
+
+// Health check
+app.get("/", (req, res) => {
+  res.send("Backend working with SERVICES API");
+});
+
+// ---- Admin Login (Standard) ----
 
 const HARDCODED_ADMIN = {
   email: process.env.ADMIN_EMAIL || "admin@aui.ma",
@@ -95,14 +102,11 @@ app.post("/api/admin/login", (req, res) => {
   res.json({ token });
 });
 
-// ---------- Admin login with Microsoft 365 ----------
-// Called from React after MSAL loginPopup succeeds
+// ---- Admin Login (Microsoft 365) ----
 
 const ALLOWED_ADMIN_EMAILS = [
-  "a.baddou@aui.ma".toLowerCase(),// put your real admin email(s) here
-  "i.moukhlis@aui.ma".toLowerCase(),
-  "a.dafir@aui.ma".toLowerCase(),
-  // add more if needed
+  "a.baddou@aui.ma".toLowerCase(), // Ensure this matches your real Microsoft email
+  // Add other admins here if needed
 ];
 
 app.post("/api/admin/microsoft-login", (req, res) => {
@@ -120,31 +124,6 @@ app.post("/api/admin/microsoft-login", (req, res) => {
   );
 
   res.json({ token });
-});
-
-// ---------- ROUTES ----------
-
-// Health check
-app.get("/", (req, res) => {
-  res.send("Backend working with SERVICES API");
-});
-
-// ---- Admin Login ----
-
-app.post("/api/admin/login", (req, res) => {
-  const { email, password } = req.body;
-
-  if (
-    email === process.env.ADMIN_EMAIL &&
-    password === process.env.ADMIN_PASSWORD
-  ) {
-    const token = jwt.sign({ role: "admin", email }, process.env.JWT_SECRET, {
-      expiresIn: "2h",
-    });
-    return res.json({ token });
-  }
-
-  res.status(401).json({ message: "Invalid credentials" });
 });
 
 // ---- SERVICES CRUD ----
@@ -209,7 +188,9 @@ app.put("/api/services/:id/active", authMiddleware, (req, res) => {
   if (index === -1)
     return res.status(404).json({ message: "Service not found" });
 
-  services[index].active = !!active; // toggle true/false only this service
+  // If we are activating this one, we can optionally deactivate others, 
+  // but your logic allows multiple actives or toggles. keeping it simple:
+  services[index].active = !!active; 
 
   writeJson(servicesFile, services);
 
@@ -353,8 +334,17 @@ app.get("/api/stats", authMiddleware, (req, res) => {
 
 // -------- START SERVER --------
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, () => {
+// Added error handling to catch "Port already in use" errors
+const server = app.listen(PORT, () => {
   console.log(`🔥 Services API backend running on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Please stop the other server or change the PORT in .env`);
+  } else {
+    console.error('❌ Server error:', err);
+  }
 });
