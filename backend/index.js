@@ -1,350 +1,219 @@
 require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
 const XLSX = require("xlsx");
 const jwt = require("jsonwebtoken");
+const db = require("./db"); // Import the database connection
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// ---------- File database setup ----------
-
-const dataDir = path.join(__dirname, "data");
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-const feedbacksFile = path.join(dataDir, "feedbacks.json");
-const servicesFile = path.join(dataDir, "services.json");
-
-function ensureFile(filePath, defaultValue) {
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2), "utf-8");
-  }
-}
-
-ensureFile(feedbacksFile, []);
-ensureFile(servicesFile, []);
-
-function readJson(filePath) {
-  const raw = fs.readFileSync(filePath, "utf-8");
-  return raw ? JSON.parse(raw) : [];
-}
-
-function writeJson(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
-}
-
-const allowedRatings = ["Excellent", "Good", "Neutral", "Satisfying", "Unsatisfying"];
-
-const ratingWeights = {
-  Excellent: 5,
-  Good: 4,
-  Neutral: 3,
-  Satisfying: 2,
-  Unsatisfying: 1,
-};
-
-// ---------- Auth middleware ----------
-
+const allowedRatings = ["Very Satisfying", "Satisfying", "Neutral", "Unsatisfying", "Very Unsatisfying"];
+const ratingWeights = { "Very Satisfying": 5, "Satisfying": 4, "Neutral": 3, "Unsatisfying": 2, "Very Unsatisfying": 1 };
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key";
 
+// --- MIDDLEWARE ---
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization || "";
   const [, token] = header.split(" ");
-
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-
+  if (!token) return res.status(401).json({ message: "No token provided" });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.admin = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res.status(401).json({ message: "Invalid token" });
   }
 }
 
-// ---------- ROUTES ----------
+// --- ROUTES ---
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("Backend working with SERVICES API");
-});
+app.get("/", (req, res) => res.send("Backend working with PostgreSQL 🐘"));
 
-// ---- Admin Login (Standard) ----
-
-const HARDCODED_ADMIN = {
-  email: process.env.ADMIN_EMAIL || "admin@aui.ma",
-  password: process.env.ADMIN_PASSWORD || "password123",
-};
-
-app.post("/api/admin/login", (req, res) => {
-  const { email, password } = req.body;
-
-  if (
-    email !== HARDCODED_ADMIN.email ||
-    password !== HARDCODED_ADMIN.password
-  ) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-
-  const token = jwt.sign(
-    { role: "admin", email },
-    JWT_SECRET,
-    { expiresIn: "8h" }
-  );
-
-  res.json({ token });
-});
-
-// ---- Admin Login (Microsoft 365) ----
-
-const ALLOWED_ADMIN_EMAILS = [
-  "a.baddou@aui.ma".toLowerCase(),
-  "i.moukhlis@aui.ma".toLowerCase(),
-  // Add other admins here if needed
-];
-
+// 1. Admin Login (Microsoft)
+const ALLOWED_ADMINS = ["a.baddou@aui.ma", "i.moukhlis@aui.ma", "a.dafir@aui.ma"];
 app.post("/api/admin/microsoft-login", (req, res) => {
-  const { email } = req.body;
-  const normalized = (email || "").toLowerCase();
-
-  if (!ALLOWED_ADMIN_EMAILS.includes(normalized)) {
-    return res.status(401).json({ message: "Not authorized as admin" });
-  }
-
-  const token = jwt.sign(
-    { role: "admin", email: normalized },
-    JWT_SECRET,
-    { expiresIn: "8h" }
-  );
-
+  const email = (req.body.email || "").toLowerCase();
+  if (!ALLOWED_ADMINS.includes(email)) return res.status(401).json({ message: "Not authorized" });
+  
+  const token = jwt.sign({ role: "admin", email }, JWT_SECRET, { expiresIn: "8h" });
   res.json({ token });
 });
 
-// ---- SERVICES CRUD ----
-
-// GET all services
-app.get("/api/services", (req, res) => {
-  res.json(readJson(servicesFile));
+// 2. Services
+app.get("/api/services", async (req, res) => {
+  try {
+    const { rows } = await db.query("SELECT * FROM services ORDER BY id ASC");
+    // Convert 'active' to boolean just in case
+    const formatted = rows.map(s => ({ ...s, active: !!s.active, id: Number(s.id) }));
+    res.json(formatted);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET active service(s)
-app.get("/api/services/active", (req, res) => {
-  const services = readJson(servicesFile);
-  res.json(services.filter((s) => s.active));
+app.get("/api/services/active", async (req, res) => {
+  try {
+    const { rows } = await db.query("SELECT * FROM services WHERE active = true");
+    const formatted = rows.map(s => ({ ...s, active: true, id: Number(s.id) }));
+    res.json(formatted);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// CREATE service
-app.post("/api/services", authMiddleware, (req, res) => {
+app.post("/api/services", authMiddleware, async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: "Name required" });
 
-  const services = readJson(servicesFile);
-
-  const newService = {
-    id: Date.now(),
-    name: name.trim(),
-    active: false,
-  };
-
-  services.push(newService);
-  writeJson(servicesFile, services);
-
-  res.status(201).json(newService);
+  const id = Date.now(); // Generate ID exactly like your JSON file
+  
+  try {
+    const { rows } = await db.query(
+      "INSERT INTO services (id, name, active) VALUES ($1, $2, $3) RETURNING *",
+      [id, name.trim(), false]
+    );
+    res.status(201).json({ ...rows[0], id: Number(rows[0].id) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// UPDATE service
-app.put("/api/services/:id", authMiddleware, (req, res) => {
-  const { name } = req.body;
-  const id = Number(req.params.id);
-
-  if (!name?.trim()) return res.status(400).json({ message: "Name required" });
-
-  const services = readJson(servicesFile);
-  const index = services.findIndex((s) => s.id === id);
-
-  if (index === -1)
-    return res.status(404).json({ message: "Service not found" });
-
-  services[index].name = name.trim();
-  writeJson(servicesFile, services);
-
-  res.json(services[index]);
+app.put("/api/services/:id", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      "UPDATE services SET name = $1 WHERE id = $2 RETURNING *",
+      [req.body.name, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Service not found" });
+    res.json({ ...rows[0], id: Number(rows[0].id) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// SET active service
-app.put("/api/services/:id/active", authMiddleware, (req, res) => {
-  const id = Number(req.params.id);
-  const { active } = req.body;
-
-  let services = readJson(servicesFile);
-
-  const index = services.findIndex((s) => s.id === id);
-  if (index === -1)
-    return res.status(404).json({ message: "Service not found" });
-
-  // If we are activating this one, we can optionally deactivate others, 
-  // but your logic allows multiple actives or toggles. keeping it simple:
-  services[index].active = !!active; 
-
-  writeJson(servicesFile, services);
-
-  res.json(services[index]);
+app.put("/api/services/:id/active", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      "UPDATE services SET active = $1 WHERE id = $2 RETURNING *",
+      [req.body.active, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Service not found" });
+    res.json({ ...rows[0], id: Number(rows[0].id) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// CLEAR all active services
-app.put("/api/services/active/clear", authMiddleware, (req, res) => {
-  const services = readJson(servicesFile);
-  const updated = services.map((s) => ({ ...s, active: false }));
-
-  writeJson(servicesFile, updated);
-  res.json({ message: "All services deactivated" });
+app.put("/api/services/active/clear", authMiddleware, async (req, res) => {
+  try {
+    await db.query("UPDATE services SET active = false");
+    res.json({ message: "All services deactivated" });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE a service
-app.delete("/api/services/:id", authMiddleware, (req, res) => {
-  const id = Number(req.params.id);
-
-  let services = readJson(servicesFile);
-
-  if (!services.some((s) => s.id === id)) {
-    return res.status(404).json({ message: "Service not found" });
-  }
-
-  services = services.filter((s) => s.id !== id);
-  writeJson(servicesFile, services);
-
-  res.json({ message: "Service deleted" });
+app.delete("/api/services/:id", authMiddleware, async (req, res) => {
+  try {
+    // Delete related feedbacks first (Foreign Key constraint)
+    await db.query("DELETE FROM feedbacks WHERE service_id = $1", [req.params.id]);
+    const { rowCount } = await db.query("DELETE FROM services WHERE id = $1", [req.params.id]);
+    
+    if (rowCount === 0) return res.status(404).json({ message: "Service not found" });
+    res.json({ message: "Service deleted" });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ---- FEEDBACK ----
-
-// Submit feedback
-app.post("/api/feedback", (req, res) => {
+// 3. Feedback
+app.post("/api/feedback", async (req, res) => {
   const { serviceId, rating, comment } = req.body;
+  
+  if (!allowedRatings.includes(rating)) return res.status(400).json({ message: "Invalid rating" });
 
-  if (!serviceId || !rating)
-    return res.status(400).json({ message: "serviceId and rating required" });
+  const id = Date.now(); // Generate ID manually
+  const createdAt = new Date().toISOString(); // Generate Date manually
 
-  const services = readJson(servicesFile);
-
-  if (!services.some((s) => s.id === Number(serviceId)))
-    return res.status(400).json({ message: "Unknown service" });
-
-  if (!allowedRatings.includes(rating))
-    return res.status(400).json({ message: "Invalid rating" });
-
-  const feedbacks = readJson(feedbacksFile);
-
-  const newFeedback = {
-    id: Date.now(),
-    serviceId: Number(serviceId),
-    rating,
-    comment: (comment || "").toString().slice(0, 500),
-    createdAt: new Date().toISOString(),
-  };
-
-  feedbacks.push(newFeedback);
-  writeJson(feedbacksFile, feedbacks);
-
-  res.status(201).json({ message: "Feedback saved" });
+  try {
+    await db.query(
+      "INSERT INTO feedbacks (id, service_id, rating, comment, created_at) VALUES ($1, $2, $3, $4, $5)",
+      [id, serviceId, rating, comment, createdAt]
+    );
+    res.status(201).json({ message: "Feedback saved" });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET feedback (admin)
-app.get("/api/feedback", authMiddleware, (req, res) => {
-  res.json(readJson(feedbacksFile));
+app.get("/api/feedback", authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await db.query("SELECT * FROM feedbacks ORDER BY created_at DESC");
+    // Map 'service_id' back to 'serviceId' to match frontend expectation
+    const formatted = rows.map(f => ({
+      id: Number(f.id),
+      serviceId: Number(f.service_id),
+      rating: f.rating,
+      comment: f.comment,
+      createdAt: f.created_at
+    }));
+    res.json(formatted);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ---- EXCEL EXPORT ----
+// 4. Stats & Export
+app.get("/api/stats", authMiddleware, async (req, res) => {
+  try {
+    const services = (await db.query("SELECT * FROM services")).rows;
+    const feedbacks = (await db.query("SELECT * FROM feedbacks")).rows;
+    
+    const stats = services.map(svc => {
+      // Loose comparison (==) handles string vs int ID differences safely
+      const related = feedbacks.filter(f => f.service_id == svc.id); 
+      const count = related.length;
+      let totalScore = 0;
+      const distribution = { Excellent: 0, Good: 0, Neutral: 0, Satisfying: 0, Unsatisfying: 0 };
+      
+      related.forEach(f => {
+        totalScore += ratingWeights[f.rating] || 0;
+        if (distribution[f.rating] !== undefined) distribution[f.rating]++;
+      });
 
-app.get("/api/feedback/export", authMiddleware, (req, res) => {
-  const feedbacks = readJson(feedbacksFile);
-  const services = readJson(servicesFile);
-
-  const rows = feedbacks.map((fb) => {
-    const svc = services.find((s) => s.id === fb.serviceId);
-
-    return {
-      "Service Name": svc ? svc.name : "Unknown",
-      "Rating Given": fb.rating,
-      "Rating Value": ratingWeights[fb.rating] || 0,
-      "Comment": fb.comment,
-      "Submission Date": new Date(fb.createdAt).toLocaleString(),
-    };
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Feedback");
-
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-
-  res.setHeader("Content-Disposition", "attachment; filename=feedback_export.xlsx");
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-
-  res.send(buffer);
-});
-
-// ---- STATS ----
-
-app.get("/api/stats", authMiddleware, (req, res) => {
-  const feedbacks = readJson(feedbacksFile);
-  const services = readJson(servicesFile);
-
-  const totalFeedbacks = feedbacks.length;
-
-  const serviceStats = services.map((svc) => {
-    const svcFeedbacks = feedbacks.filter((fb) => fb.serviceId === svc.id);
-
-    const count = svcFeedbacks.length;
-    let totalScore = 0;
-
-    const distribution = {
-      Excellent: 0,
-      Good: 0,
-      Neutral: 0,
-      Satisfying: 0,
-      Unsatisfying: 0,
-    };
-
-    svcFeedbacks.forEach((fb) => {
-      totalScore += ratingWeights[fb.rating];
-      distribution[fb.rating]++;
+      return { 
+        id: Number(svc.id), 
+        name: svc.name, 
+        feedbackCount: count, 
+        averageScore: count > 0 ? totalScore / count : null,
+        ratingDistribution: distribution 
+      };
     });
 
-    return {
-      id: svc.id,
-      name: svc.name,
-      feedbackCount: count,
-      averageScore: count > 0 ? totalScore / count : null,
-      ratingDistribution: distribution,
-    };
-  });
-
-  res.json({
-    totalFeedbacks,
-    services: serviceStats,
-  });
+    res.json({ totalFeedbacks: feedbacks.length, services: stats });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// -------- START SERVER --------
+app.get("/api/feedback/export", authMiddleware, async (req, res) => {
+  try {
+    const query = `
+      SELECT s.name as "Service Name", f.rating as "Rating Given", 
+             f.comment as "Comment", f.created_at as "Submission Date"
+      FROM feedbacks f
+      JOIN services s ON f.service_id = s.id
+      ORDER BY f.created_at DESC
+    `;
+    const { rows } = await db.query(query);
 
+    const exportData = rows.map(row => ({
+      ...row,
+      "Rating Value": ratingWeights[row["Rating Given"]] || 0,
+      "Submission Date": new Date(row["Submission Date"]).toLocaleString(),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Feedback");
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Disposition", "attachment; filename=feedback_export.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buffer);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Start Server
 const PORT = process.env.PORT || 5001;
-
-// Added error handling to catch "Port already in use" errors
-const server = app.listen(PORT, () => {
-  console.log(`🔥 Services API backend running on port ${PORT}`);
-});
+const server = app.listen(PORT, () => console.log(`🔥 PostgreSQL Backend running on port ${PORT}`));
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use. Please stop the other server or change the PORT in .env`);
+    console.error(`❌ Port ${PORT} is already in use.`);
   } else {
     console.error('❌ Server error:', err);
   }
